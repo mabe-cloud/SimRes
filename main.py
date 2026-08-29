@@ -25,11 +25,11 @@ plt.figure(figsize=(9, 6))
 
 for t in tempos:
     p = p1_1D(x, t, pe, pw, L, k, phi, mu, ct, N)
-    plt.plot(x, p, label=f"t = {t}")
+    plt.plot(x, p, label=f"t = {t} s")
 
-plt.xlabel("x")
-plt.ylabel("p")
-plt.title("Solução Regime Permanente Linear")
+plt.xlabel('Posição (m)', size=13)
+plt.ylabel("Pressão (Pa)", size=13)
+plt.title("Solução Regime Permanente Linear", size=16)
 plt.grid(True, alpha=0.3)
 plt.legend()
 plt.tight_layout()
@@ -43,11 +43,11 @@ plt.figure(figsize=(9, 6))
 
 for t in tempos:
     p = p2_1D(x, t,p0, qw, mu, L, k, A, phi, ct)
-    plt.plot(x, p, label=f"t = {t}")
+    plt.plot(x, p, label=f"t = {t} s")
 
-plt.xlabel("x")
-plt.ylabel("p")
-plt.title("Regime Transiente Linear")
+plt.xlabel('Posição (m)', size=13)
+plt.ylabel("Pressão (Pa)", size=13)
+plt.title("Regime Transiente Linear", size=16)
 plt.grid(True, alpha=0.3)
 plt.legend()
 plt.tight_layout()
@@ -61,14 +61,14 @@ plt.figure(figsize=(10, 7))
 
 for t in tempos_longos:
     p = p2_1D(x, t, p0, qw, mu, L, k, A, phi, ct)
-    plt.plot(x, p, label=f"t = {t}")
+    plt.plot(x, p, label=f"t = {t} s")
 
 plt.axvline(x=L,color="black",linestyle="--",alpha=0.5)
 
 
-plt.xlabel("x")
-plt.ylabel("p")
-plt.title("Regime Pseudopermanente Linear")
+plt.xlabel('Posição (m)', size=13)
+plt.ylabel("Pressão (Pa)", size=13)
+plt.title("Regime Pseudopermanente Linear", size=16)
 plt.grid(True, alpha=0.3)
 plt.legend(ncol=2)
 plt.tight_layout()
@@ -102,36 +102,28 @@ qw = Bo * qw_std
 r = np.linspace(rw, re, 500)
 
 plt.figure(figsize=(9, 6))
-tempos = [60,60*30, 60*60, 60*60*6, 60*60*12,86400, 86400*2, 3*86400, 4*86400]
+tempos = [60*30, 60*60*3, 60*60*12, 86400*2, 4*86400, 8*86400]
 for t in tempos:
     p = p_transiente_1D_radial(r, t, p0, qw, mu, h, k, phi, ct) * 1e-6
     plt.plot(r, p, label=f"t = {t} s = {t/(60*60)} h")
 
 plt.xlabel('Posição radial (m)', size=13)
 plt.ylabel("Pressão (MPa)", size=13)
-plt.title("Radial 1D")
-
-plt.title(r'Solução Transiente Radial 1D',size=16
-)
+plt.title(r'Solução Transiente Radial 1D',size=16)
 
 plt.grid(True, alpha=0.3)
 plt.legend()
 plt.tight_layout()
 plt.show()
 
-tempos = [60, 60*60, 60*60*12,86400, 86400*3, 6*86400, 12*86400, 24*86400, 48*86400]
+tempos = [60*30, 86400, 86400*3, 7*86400, 14*86400, 30*86400]
 for t in tempos:
     p = p_pseudopermanente_1D_radial(r, re, rw, t, p0, qw, mu, h, k, phi, ct) * 1e-6
     plt.plot(r, p, label=f"t = {t} s = {t/(60*60)} h")
 
 plt.xlabel('Posição radial (m)', size=13)
 plt.ylabel("Pressão (MPa)", size=13)
-plt.title("Radial 1D")
-
-plt.title(r'Solução Pseudopermanente Radial 1D',
-    size=16
-)
-
+plt.title(r'Solução Pseudopermanente Radial 1D',size=16)
 plt.grid(True, alpha=0.3)
 plt.legend()
 plt.tight_layout()
