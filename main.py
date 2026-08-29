@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from analiticas import p1_1D, p2_1D
+from analiticas import p1_1D, p2_1D, p_pseudopermanente_1D_radial, p_transiente_1D_radial
 
 p0 = 50000
 pe = p0
@@ -71,5 +71,68 @@ plt.ylabel("p")
 plt.title("Regime Pseudopermanente Linear")
 plt.grid(True, alpha=0.3)
 plt.legend(ncol=2)
+plt.tight_layout()
+plt.show()
+
+
+####################################
+############## Radial ##############
+####################################
+
+# Dados
+
+pe = 300 * 98066.5 # kgf/cm2 para Pa
+pw = 150 * 98066.5 # kgf/cm2 para Pa
+rw = 1 # m
+re = 500 # m
+k = 20 * 9.869e-16 # md para m2
+phi = 0.18
+mu = 0.8 *1e-3 # cp para Pa.s
+ct = 150e-6 * 1.0197e-5 # (kgf/cm2)^-1 para Pa^-1
+N = 100
+h = 20 # espessura da formacao - m
+
+# Dados para o transiente
+
+Bo = 1.2 # m3 / m3std
+qw_std = 400 * 1/86400 # m3std/dia para m3std/s
+p0 = pe # pressão inicial
+qw = Bo * qw_std
+
+r = np.linspace(rw, re, 500)
+
+plt.figure(figsize=(9, 6))
+tempos = [60,60*30, 60*60, 60*60*6, 60*60*12,86400, 86400*2, 3*86400, 4*86400]
+for t in tempos:
+    p = p_transiente_1D_radial(r, t, p0, qw, mu, h, k, phi, ct) * 1e-6
+    plt.plot(r, p, label=f"t = {t} s = {t/(60*60)} h")
+
+plt.xlabel('Posição radial (m)', size=13)
+plt.ylabel("Pressão (MPa)", size=13)
+plt.title("Radial 1D")
+
+plt.title(r'Solução Transiente Radial 1D',size=16
+)
+
+plt.grid(True, alpha=0.3)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+tempos = [60, 60*60, 60*60*12,86400, 86400*3, 6*86400, 12*86400, 24*86400, 48*86400]
+for t in tempos:
+    p = p_pseudopermanente_1D_radial(r, re, rw, t, p0, qw, mu, h, k, phi, ct) * 1e-6
+    plt.plot(r, p, label=f"t = {t} s = {t/(60*60)} h")
+
+plt.xlabel('Posição radial (m)', size=13)
+plt.ylabel("Pressão (MPa)", size=13)
+plt.title("Radial 1D")
+
+plt.title(r'Solução Pseudopermanente Radial 1D',
+    size=16
+)
+
+plt.grid(True, alpha=0.3)
+plt.legend()
 plt.tight_layout()
 plt.show()
