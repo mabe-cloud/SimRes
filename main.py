@@ -90,7 +90,7 @@ phi = 0.18
 mu = 0.8 *1e-3 # cp para Pa.s
 ct = 150e-6 * 1.0197e-5 # (kgf/cm2)^-1 para Pa^-1
 N = 100
-h = 20 # espessura da formacao - m
+h = 20 # altura da formacao - m
 
 # Dados para o transiente
 
