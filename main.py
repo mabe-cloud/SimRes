@@ -1,4 +1,32 @@
+##################
+#### NEW MAIN ####
+##################
 import numpy as np
+from EDH import Analytical
+
+p0 = 50000
+pe = p0
+pw = 1000
+L = 1000
+e = 0.2
+A = L*e
+k = 0.01
+phi = 0.20
+mu = 0.4
+ct = 1e-5
+eta = k / (phi * mu * ct)
+
+
+#%% Regime Permanente ---------------------------------------------------------
+tempos = [50, 100, 200]
+
+Analitica = Analytical(dimension=1, coordinates='Linear', ci=p0, cc=[['Dirichlet', 'Dirichlet'], [pw,pe]], grid=[500], system_units='BR')
+Analitica.model_parameters(eta=eta,lengths=[L], area=A,time_list=tempos, node_L=[500])
+Analitica.run()
+
+##################
+#### OLD MAIN ####
+##################
 import matplotlib.pyplot as plt
 from analiticas import p1_1D, p2_1D, p_pseudopermanente_1D_radial, p_transiente_1D_radial
 
