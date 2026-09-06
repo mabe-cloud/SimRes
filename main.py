@@ -3,6 +3,7 @@
 ##################
 import numpy as np
 from EDH import Analytical
+from EDH import Numerical
 
 p0 = 50000
 pe = p0
@@ -19,6 +20,7 @@ eta = k / (phi * mu * ct)
 
 #%% Regime Permanente ---------------------------------------------------------
 tempos = [50, 100, 200]
+tempos = [1, 2, 3, 4, 5]
 
 Analitica = Analytical(dimension=1, coordinates='Linear', ci=p0, cc=[['Dirichlet', 'Dirichlet'], [pw,pe]], grid=[500], system_units='SI')
 Analitica.model_parameters(eta=eta,k=k,phi=phi,mu=mu,ct=ct,lengths=[L], area=A,time_list=tempos)
@@ -38,6 +40,16 @@ Analitica.model_parameters(eta=eta,k=k,phi=phi,mu=mu,ct=ct,lengths=[L], area=A,t
 Analitica.run()
 Analitica.postprocess(title="Regime Pseudopermanente Linear")
 
+Numerico1 = Numerical(dimension=1, coordinates='Linear', ci=p0, cc=[['dirichlet', 'dirichlet'],[pw,pe]], grid=[100],theta=0, system_units='SI')
+Numerico1.model_parameters(eta=eta, k=k, phi=phi, mu=mu, ct=ct, lengths=[L],area=A, final_time=5, nt=5000)
+Numerico1.run()
+Numerico1.postprocess(title="Explícito - Regime Permanente Linear")
+
+
+Numerico2 = Numerical(dimension=1, coordinates='Linear', ci=p0, cc=[['Neumann', 'dirichlet'],[qw,pe]], grid=[200],theta=0, system_units='SI')
+Numerico2.model_parameters(eta=eta, k=k, phi=phi, mu=mu, ct=ct, lengths=[L*10],area=A, final_time=100, nt=200000)
+Numerico2.run()
+Numerico2.postprocess(title="Explícito - Regime Transiente Linear", times_to_plot=tempos_longos, xlim=[0,1000])
 
 # Dados
 pe = 300 * 98066.5 # kgf/cm2 para Pa
