@@ -1,5 +1,3 @@
-from sys import addaudithook
-
 import numpy as np
 from scipy.special import erfc
 from scipy.special import expi
