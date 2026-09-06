@@ -21,15 +21,15 @@ class Analytical:
         São as condições de contorno do problema. Podem ser do tipo Dirichlet (pressão) ou Neumann (vazão).
         Considera-se que o poço está localizado no lado esquerdo e a fronteira do reservatório no lado direito.
 
-    grid : (nx,ny,nz)
+    grid : [nx,ny,nz]
         Define o tamanho da malha do problema.
 
-    system_units : 'SI', 'BR' ou 'USA'
-        Informa o sistema de unidades a ser utilizado na modelagem.
+    system_units : 'SI', 'BR', 'USA' ou 'D'
+        Informa o sistema de unidades a ser utilizado na modelagem, em que 'D' se refere a sem dimensão.
 
     """
 
-    def __init__(self, dimension : int, coordinates : str, ci : float, cc : [list, list], grid : list, system_units : str):
+    def __init__(self, dimension : int, coordinates : str, ci : float, cc : [list, list], grid : list, system_units = 'SI'):
         self.dimension, self.ci, self.cc, self.grid, self.system_units = dimension, ci, cc, grid, system_units
         self.coordinates = coordinates
         if any([None == var for var in self.__dict__.values()]):
@@ -44,61 +44,107 @@ class Analytical:
 
         self.coordinates = self.coordinates.lower()
 
-    def model_parameters(self, eta : float, lengths : list, area : float, time_list : list, node_L : list):
+    def model_parameters(self, eta : float, k : float, phi : float, mu : float, ct : float, lengths : list, area : float, time_list : list, rw = None):
         """
         Define os parâmetros de entrada do modelo.
 
         eta : float
             É o coeficiente difusivo.
-        lengths : [Lx, Ly, Lz] ou [Ri, Re, LZ]
+        k : float
+            É a permeabilidade.
+        phi : float
+            É a porosidade.
+        mu : float
+            É a viscosidade do fluido.
+        ct : float
+            É a compressibilidade total.
+        lengths : [Lx, Ly, Lz] ou [R, h, theta]
             São os comprimentos/tamanhos do modelo. O primeiro comprimento tem preferência sobre os demais.
             Assim, por exemplo, num problema 1D o comprimento Lx será utilizado e Ly e Lz tomados como a área
+        well_size : float
+            Tamanho do poço. Pode ser um comprimento linear ou radial.
         area : float
             A área pode ser fornecida diretamente, caso não se defina todos os comprimentos necessários.
         time_list : tempos a serem modelados
             Define os tempos em que será feita a modelagem.
-        node_L : [nx, ny, nz]
-            Número de blocos espaciais, em cada dimensão
         """
-        self.eta = eta
+        if eta is None: self.eta = k / (phi * mu * ct)
+        else: self.eta = eta
+        self.k, self.phi, self.mu, self.ct = k, phi, mu, ct
         self.time_list = time_list
-        if self.coordinates == 'linear':
-            if self.dimension == 1:
+        self.rw = rw
+        self.p0 = self.ci
+        if self.dimension == 1:
+            pos = 0
+            for cc_type, value in zip(*self.cc):
+                if pos == 0:
+                    if 'dirichlet' == cc_type.lower():
+                        self.pw = value
+                    if 'neumann' == cc_type.lower():
+                        self.qw = value
+                elif pos == 1:
+                    if 'dirichlet' == cc_type.lower():
+                        self.pe = value
+                    if 'neumann' == cc_type.lower():
+                        self.qe = value
+
+                else:
+                    raise IndexError(
+                        'Há discrepância entre os índices dos valores das condições de contorno e seus tipos')
+                pos += 1
+            if self.coordinates == 'linear':
                 self.L = lengths[0]
-                self.L_list = np.linspace(0.1, lengths[0], node_L[0])
+                if self.rw is None:
+                    self.L_list = np.linspace(0.1, lengths[0], self.grid[0])
+                else:
+                    self.L_list = np.linspace(self.rw, lengths[0], self.grid[0])
                 if area is None: self.area = lengths[1] * lengths[2]
                 else: self.area = area
-                pos = 0
-                for cc_type, value in zip(*self.cc):
-                    if pos == 0:
-                        if 'dirichlet' == cc_type.lower():
-                            self.pw = value
-                        if 'neumann' == cc_type.lower():
-                            self.qw = value
-                    elif pos ==1:
-                        if 'dirichlet' == cc_type.lower():
-                            self.pe = value
-                        if 'neumann' == cc_type.lower():
-                            self.qe = value
 
-                    else: raise IndexError('Há discrepância entre os índices dos valores das condições de contorno e seus tipos')
-                    pos += 1
+            if self.coordinates == 'radial':
+                    self.Re = lengths[0]
+                    self.h = lengths[1]
+                    if self.rw is None:
+                        self.R_list = np.linspace(0.1, lengths[0], self.grid[0])
+                    else:
+                        self.R_list = np.linspace(self.rw, lengths[0], self.grid[0])
 
-        self.get_model()
-
-    def get_model(self):
+    def run(self):
         if self.coordinates == 'linear':
             if self.dimension == 1:
                 if all(['dirichlet' == cond.lower() for cond in self.cc[0]]):
                     self.model = 'p1_1D'
+                    pressures = []
+                    for t in self.time_list:
+                        pressures.append(p1_1D(self.L_list, t, self.pe, self.pw, self.eta, self.L))
+            if 'neumann' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][1].lower():
+                self.model = 'p2_1D'
+                pressures = []
+                for t in self.time_list:
+                    pressures.append(
+                        p2_1D(self.L_list, t, self.p0, self.qw, self.mu, self.L, self.k, self.area, self.phi, self.ct))
+        if self.coordinates == 'radial':
+            if 'neumann' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][1].lower():
+                self.model = 'p_transiente_1D_radial'
+                pressures = []
+                for t in self.time_list:
+                    pressures.append(
+                        p_transiente_1D_radial(self.R_list, t, self.p0, self.qw, self.mu, self.h, self.k, self.phi, self.ct))
 
-    def run(self):
-        if self.model == 'p1_1D':
-            pressures = []
-            for t in self.time_list:
-                pressures.append(p1_1D(self.L_list, t, self.pe, self.pw, self.eta, self.L))
+            if 'dirichlet' == self.cc[0][0].lower() and 'neumann' == self.cc[0][1].lower():
+                self.model = 'p_pseudopermanente_1D_radial'
+                pressures = []
+                for t in self.time_list:
+                    pressures.append(
+                        p_pseudopermanente_1D_radial(self.R_list, self.Re, self.rw, t, self.p0, self.qe, self.mu, self.h, self.k, self.phi, self.ct))
+
+        self.pressures = pressures
+    def postprocess(self, title):
         from PostProcess import post_process
-        post_process(self.L_list,pressures, self.time_list)
+        try:
+            post_process(self.L_list,self.pressures, self.time_list,self.model,title)
+        except:
+            post_process(self.R_list, self.pressures, self.time_list, self.model, title)
 
 
 

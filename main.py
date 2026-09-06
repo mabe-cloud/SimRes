@@ -20,9 +20,52 @@ eta = k / (phi * mu * ct)
 #%% Regime Permanente ---------------------------------------------------------
 tempos = [50, 100, 200]
 
-Analitica = Analytical(dimension=1, coordinates='Linear', ci=p0, cc=[['Dirichlet', 'Dirichlet'], [pw,pe]], grid=[500], system_units='BR')
-Analitica.model_parameters(eta=eta,lengths=[L], area=A,time_list=tempos, node_L=[500])
+Analitica = Analytical(dimension=1, coordinates='Linear', ci=p0, cc=[['Dirichlet', 'Dirichlet'], [pw,pe]], grid=[500], system_units='SI')
+Analitica.model_parameters(eta=eta,k=k,phi=phi,mu=mu,ct=ct,lengths=[L], area=A,time_list=tempos)
 Analitica.run()
+Analitica.postprocess(title="Solução Regime Permanente Linear")
+
+tempos = [1, 2, 3, 4, 5]
+qw = 80
+Analitica = Analytical(dimension=1, coordinates='Linear', ci=p0, cc=[['Neumann', 'Dirichlet'], [qw,pe]], grid=[500], system_units='SI')
+Analitica.model_parameters(eta=eta,k=k,phi=phi,mu=mu,ct=ct,lengths=[L], area=A,time_list=tempos)
+Analitica.run()
+Analitica.postprocess(title="Regime Transiente Linear")
+
+tempos_longos = [10, 15, 20, 25, 30, 40, 50, 70, 100]
+
+Analitica.model_parameters(eta=eta,k=k,phi=phi,mu=mu,ct=ct,lengths=[L], area=A,time_list=tempos_longos)
+Analitica.run()
+Analitica.postprocess(title="Regime Pseudopermanente Linear")
+
+
+# Dados
+pe = 300 * 98066.5 # kgf/cm2 para Pa
+pw = 150 * 98066.5 # kgf/cm2 para Pa
+rw = 1 # m
+re = 500 # m
+k = 20 * 9.869e-16 # md para m2
+phi = 0.18
+mu = 0.8 *1e-3 # cp para Pa.s
+ct = 150e-6 * 1.0197e-5 # (kgf/cm2)^-1 para Pa^-1
+N = 100
+h = 20 # altura da formacao - m
+# Dados para o transiente
+Bo = 1.2 # m3 / m3std
+qw_std = 400 * 1/86400 # m3std/dia para m3std/s
+p0 = pe # pressão inicial
+qw = Bo * qw_std
+tempos = [60*30, 60*60*3, 60*60*12, 86400*2, 4*86400, 8*86400]
+Analitica_radial = Analytical(dimension=1, coordinates='Radial', ci=p0, cc=[['Neumann', 'Dirichlet'], [qw,pe]], grid=[500], system_units='SI')
+Analitica_radial.model_parameters(eta=None, k=k, phi=phi, mu=mu, ct=ct, lengths=[re,h], area=A,time_list=tempos, rw=rw)
+Analitica_radial.run()
+Analitica_radial.postprocess(title='Solução Transiente Radial 1D')
+
+tempos = [60*30, 86400, 86400*3, 7*86400, 14*86400, 30*86400]
+Analitica_radial = Analytical(dimension=1, coordinates='Radial', ci=p0, cc=[['Dirichlet', 'Neumann'], [p0,qw]], grid=[500], system_units='SI')
+Analitica_radial.model_parameters(eta=None, k=k, phi=phi, mu=mu, ct=ct, lengths=[re,h], area=A,time_list=tempos, rw=rw)
+Analitica_radial.run()
+Analitica_radial.postprocess(title='Solução Pseudopermanente Radial 1D')
 
 ##################
 #### OLD MAIN ####
