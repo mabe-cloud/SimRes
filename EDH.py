@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.special import erfc
 from scipy.special import expi
+from Solvers import Solve
 
 class Analytical:
     """
@@ -319,12 +320,15 @@ class Numerical:
                     self.R_list = np.linspace(self.rw, lengths[0], self.grid[0])
 
         self.Gamma = -self.mu / (self.k * self.area)
+        self.time_list = np.linspace(0, self.final_time, self.nt + 1)
 
     def run(self):
         if self.coordinates == 'linear':
             if self.dimension == 1:
                 if self.theta == 0:
                     self.explicita_1D()
+                if self.theta != 0:
+                    self.implicita_1D()
     def matriz(self):
         """
         Faz a montagem da matriz
@@ -335,7 +339,6 @@ class Numerical:
 
     def explicita_1D(self):
         self.pressures = np.zeros((self.nt + 1, self.nx))
-        self.time_list = np.linspace(0, self.final_time, self.nt + 1)
         for i in range(self.nx):
             self.pressures[0, i] = self.p0
 
@@ -356,6 +359,101 @@ class Numerical:
                 else:
                     # Central
                     self.pressures[n + 1, i] = self.beta * self.pressures[n, i + 1] + (1 - 2 * self.beta) * self.pressures[n, i] + self.beta * self.pressures[n, i - 1]
+
+    def implicita_1D(self):
+        t = 0
+        Nx = 0
+
+        P_matriz_old = np.ones(self.nx)*self.p0 # Pressão inicial do reservatório
+        P_matriz = np.zeros((self.nt+1, self.nx))
+        P_matriz[Nx,:] = self.p0
+        b_matriz = np.zeros(self.nx)
+
+        # while t < self.final_time:
+        #     Nx = Nx + 1
+        #     A_matriz = np.zeros((self.nx, self.nx))
+        #
+        #     for i in range(self.nx):
+        #         # Condições de Contorno:
+        #         if i == 0:  # Fronteira esquerda
+        #             if 'dirichlet' == self.cc[0][0].lower():
+        #                 A_matriz[i, i] = 1 + 4 * self.beta * self.theta
+        #                 A_matriz[i, i + 1] = - 4 / 3 * self.beta * self.theta
+        #                 b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i+1]+8/3*self.beta*self.pw
+        #
+        #             elif 'neumann' == self.cc[0][0].lower():
+        #                 A_matriz[i, i] = 1 + self.beta * self.theta
+        #                 A_matriz[i, i + 1] = -self.beta * self.theta
+        #                 b_matriz[i] = (1-self.beta*(1-self.theta))*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i+1] + (self.eta*self.dt*self.Gamma/self.dx) * self.qw
+        #
+        #         elif i == self.nx - 1:  # Fronteira direita
+        #             if 'dirichlet' == self.cc[0][1].lower():
+        #                 A_matriz[i, i - 1] = - 4 / 3 * self.beta * self.theta
+        #                 A_matriz[i, i] =1 + 4 * self.beta * self.theta
+        #                 b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i-1]+8/3*self.beta*self.pe
+        #
+        #             elif 'neumann' == self.cc[0][1].lower():
+        #                 A_matriz[i, i - 1] = -self.beta * self.theta
+        #                 A_matriz[i, i] = 1 + self.beta * self.theta
+        #                 b_matriz[i] = self.beta * (1-self.theta)*P_matriz_old[i-1] + (1-self.beta*(1-self.theta))*P_matriz_old[i] - (self.eta*self.dt*self.Gamma/self.dx) * self.qe
+        #
+        #         else:  # Central
+        #             A_matriz[i, i - 1] = -self.beta*self.theta
+        #             A_matriz[i, i] = 2*self.beta*self.theta + 1
+        #             A_matriz[i, i + 1] = -self.beta*self.theta
+        #             b_matriz[i] = self.beta*(1-self.theta)*P_matriz_old[i+1] +(-2*self.beta*(1-self.theta)+1)*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i-1]
+        #
+        #     # Qual método vai usar...
+        #
+        #     x0 = P_matriz_old # chute inicial
+        #     P_matriz_new = Solve.TDMA(A_matriz, b_matriz)
+        #     P_matriz_old = P_matriz_new.copy()
+        #     t = t + self.dt
+        #     P_matriz[Nx, :] = P_matriz_new
+        for n in range(self.nt):
+            if n%5 == 0:
+                print(f'Progresso: {n/self.nt*100}%')
+            Nx = Nx + 1
+            A_matriz = np.zeros((self.nx, self.nx))
+
+            for i in range(self.nx):
+                # Condições de Contorno:
+                if i == 0:  # Fronteira esquerda
+                    if 'dirichlet' == self.cc[0][0].lower():
+                        A_matriz[i, i] = 1 + 4 * self.beta * self.theta
+                        A_matriz[i, i + 1] = - 4 / 3 * self.beta * self.theta
+                        b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i+1]+8/3*self.beta*self.pw
+
+                    elif 'neumann' == self.cc[0][0].lower():
+                        A_matriz[i, i] = 1 + self.beta * self.theta
+                        A_matriz[i, i + 1] = -self.beta * self.theta
+                        b_matriz[i] = (1-self.beta*(1-self.theta))*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i+1] + (self.eta*self.dt*self.Gamma/self.dx) * self.qw
+
+                elif i == self.nx - 1:  # Fronteira direita
+                    if 'dirichlet' == self.cc[0][1].lower():
+                        A_matriz[i, i - 1] = - 4 / 3 * self.beta * self.theta
+                        A_matriz[i, i] =1 + 4 * self.beta * self.theta
+                        b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i-1]+8/3*self.beta*self.pe
+
+                    elif 'neumann' == self.cc[0][1].lower():
+                        A_matriz[i, i - 1] = -self.beta * self.theta
+                        A_matriz[i, i] = 1 + self.beta * self.theta
+                        b_matriz[i] = self.beta * (1-self.theta)*P_matriz_old[i-1] + (1-self.beta*(1-self.theta))*P_matriz_old[i] - (self.eta*self.dt*self.Gamma/self.dx) * self.qe
+
+                else:  # Central
+                    A_matriz[i, i - 1] = -self.beta*self.theta
+                    A_matriz[i, i] = 2*self.beta*self.theta + 1
+                    A_matriz[i, i + 1] = -self.beta*self.theta
+                    b_matriz[i] = self.beta*(1-self.theta)*P_matriz_old[i+1] +(-2*self.beta*(1-self.theta)+1)*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i-1]
+
+            # Qual método vai usar...
+
+            x0 = P_matriz_old # chute inicial
+            P_matriz_new = Solve.TDMA(A_matriz, b_matriz)
+            P_matriz_old = P_matriz_new.copy()
+            P_matriz[n + 1, :] = P_matriz_new
+        self.pressures = P_matriz
+
 
     def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None):
         from PostProcess import post_process
