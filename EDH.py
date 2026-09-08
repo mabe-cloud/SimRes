@@ -261,7 +261,7 @@ class Numerical:
         self.p0 = self.ci
         self.nt = nt
         self.dt = self.final_time/self.nt
-
+        self.lengths = lengths
 
         if len(self.grid) == 1:
             self.dx = lengths[0]/self.grid[0]
@@ -271,7 +271,8 @@ class Numerical:
         if self.theta == 0:
             if self.beta > 1 / 2:
                 raise ValueError('Os valores escolhidos para eta, dx e dt não passaram no critério de convergência!')
-
+        if (0<=self.theta <=1) is False:
+            raise ValueError(f'O valor de theta {self.theta} não pode ser usado!\nEscolha entre 0 e 1!')
         self.rw = rw
         if self.dimension == 1:
             pos = 0
@@ -329,6 +330,7 @@ class Numerical:
                     self.explicita_1D()
                 if self.theta != 0:
                     self.implicita_1D()
+        self.compute_error()
     def matriz(self):
         """
         Faz a montagem da matriz
@@ -438,7 +440,7 @@ class Numerical:
                     elif 'neumann' == self.cc[0][1].lower():
                         A_matriz[i, i - 1] = -self.beta * self.theta
                         A_matriz[i, i] = 1 + self.beta * self.theta
-                        b_matriz[i] = self.beta * (1-self.theta)*P_matriz_old[i-1] + (1-self.beta*(1-self.theta))*P_matriz_old[i] - (self.eta*self.dt*self.Gamma/self.dx) * self.qe
+                        b_matriz[i] = self.beta * (1-self.theta)*P_matriz_old[i-1] + (1-self.beta*(1-self.theta))*P_matriz_old[i] + (self.eta*self.dt*self.Gamma/self.dx) * self.qe
 
                 else:  # Central
                     A_matriz[i, i - 1] = -self.beta*self.theta
@@ -454,6 +456,35 @@ class Numerical:
             P_matriz[n + 1, :] = P_matriz_new
         self.pressures = P_matriz
 
+    def compute_error(self):
+        try:
+            time_list = np.linspace(0, self.final_time, self.nt + 1)
+            analitical = Analytical(self.dimension, self.coordinates, self.ci, self.cc, self.grid, self.system_units)
+            analitical.model_parameters(self.eta, self.k, self.phi, self.mu, self.ct, self.lengths, self.area,
+                         time_list, self.rw)
+            analitical.run()
+            an_pressures = analitical.pressures
+            E_max = 0
+            Err_relativo = []
+            soma = 0
+            for n in range(len(self.pressures)):
+                for i in range(len(self.pressures[0])):
+                    soma += abs((an_pressures[n][i] - self.pressures[n][i]) / an_pressures[n][i])
+                    E_max = max(E_max,abs(an_pressures[n][i] - self.pressures[n][i]))
+                Err_relativo.append(soma)
+                soma = 0
+            Err_RMSE = []
+            for n in range(len(self.pressures)):
+                for i in range(len(self.pressures[0])):
+                    soma += abs(an_pressures[n][i] - self.pressures[n][i])**2
+                Err_RMSE.append((soma/len(self.pressures[0]))**(1/2))
+                soma = 0
+
+
+
+
+        except:
+            print('Não foi encontrada uma solução analítica para computar os erros!')
 
     def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None):
         from PostProcess import post_process

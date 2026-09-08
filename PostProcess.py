@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
-
+import numpy as np
 def post_process(L :list,pressures:list, time_list:list, title :str = None,xlim : list = None, times_to_plot:list = None):
-
+    # todo - mudar nome para algo como pressure_curves
     plt.figure(figsize=(9, 6))
     if isinstance(pressures, list):
         for p,t in zip(pressures,time_list):
@@ -36,12 +36,15 @@ def maps_plot(time_list, t_selected, x_pos, p_an, p_explicit, p_implicit, cmap=N
     if units == "SI":
         t_unidade = 's'
         p_unidade = 'Pa'
+        m_unidade = 'm'
     elif units == 'BR':
         t_unidade = 's'
         p_unidade = 'kgf/cm^2'
+        m_unidade = 'm'
     else:
         t_unidade = 's'
         p_unidade = 'psi'
+        m_unidade = 'ft'
 
     n_rows = len(t_selected)
     xgrid = x_pos
@@ -79,6 +82,8 @@ def maps_plot(time_list, t_selected, x_pos, p_an, p_explicit, p_implicit, cmap=N
                 ax.set_ylabel(f't = {t_val}{t_unidade}', fontsize=11)
 
             ax.set_yticks([])
+            if i == len(t_selected) - 1:
+                ax.set_xlabel(f"Posição ({m_unidade})")
 
     fig.subplots_adjust(right=0.85)
     cbar_ax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
