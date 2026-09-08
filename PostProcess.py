@@ -38,11 +38,11 @@ def maps_plot(time_list, t_selected, x_pos, p_an, p_explicit, p_implicit, cmap=N
         p_unidade = 'Pa'
         m_unidade = 'm'
     elif units == 'BR':
-        t_unidade = 's'
+        t_unidade = 'h'
         p_unidade = 'kgf/cm^2'
         m_unidade = 'm'
     else:
-        t_unidade = 's'
+        t_unidade = 'h'
         p_unidade = 'psi'
         m_unidade = 'ft'
 
