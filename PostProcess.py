@@ -1,6 +1,8 @@
 from matplotlib import pyplot as plt
 import numpy as np
-def post_process(L :list,pressures:list, time_list:list, title :str = None,xlim : list = None, times_to_plot:list = None):
+
+
+"""def post_process(L :list,pressures:list, time_list:list, title :str = None,xlim : list = None, times_to_plot:list = None):
     # todo - mudar nome para algo como pressure_curves
     plt.figure(figsize=(9, 6))
     if isinstance(pressures, list):
@@ -23,6 +25,54 @@ def post_process(L :list,pressures:list, time_list:list, title :str = None,xlim 
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
+    plt.show()"""
+
+
+def plot_p(L: list, Pressures: list, time_list: list, title : str = None, xlim : list = None, times_to_plot: list = None, pos_to_plot: list = None, units = 'SI'):
+    """
+    Plota gráficos com cortes de p em tempos e posições específicas.
+    """
+    if units == "SI":
+        t_unidade = 's'
+        p_unidade = 'Pa'
+        m_unidade = 'm'
+    elif units == 'BR':
+        t_unidade = 'h'
+        p_unidade = 'kgf/cm^2'
+        m_unidade = 'm'
+    else:
+        t_unidade = 'h'
+        p_unidade = 'psi'
+        m_unidade = 'ft'
+
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig.suptitle(f'{title}')
+
+
+    if times_to_plot is None:
+        for p,t in zip(Pressures, time_list):
+            ax1.plot(L, p, label=f"t = {t}{t_unidade}")
+    elif isinstance(Pressures, list):
+        for p,t in zip(Pressures,time_list):
+            ax1.plot(L, p, label=f"t = {t}{t_unidade}")
+    else:
+        for i in range(len(Pressures)):
+            if any(time_list[i] == time for time in times_to_plot):
+                ax1.plot(L, Pressures[i], label=f"t = {time_list[i]}{t_unidade}")
+
+    if pos_to_plot is None:
+        for i,x in enumerate(L):
+            p_to_plot = []
+            for j in range(len(time_list)):
+                p_to_plot.append(Pressures[j][i])
+            ax2.plot(time_list, p_to_plot, label=f"t = {x}{m_unidade}")
+    else:
+        for i,x in enumerate(L):
+            if any(x == pos for pos in pos_to_plot):
+                p_to_plot = []
+                for j in range(len(time_list)):
+                    p_to_plot.append(Pressures[j][i])
+                ax2.plot(time_list, p_to_plot, label=f"t = {x}{m_unidade}")
     plt.show()
 
 def maps_plot(time_list, t_selected, x_pos, p_an, p_explicit, p_implicit, cmap=None, units = 'SI'):
