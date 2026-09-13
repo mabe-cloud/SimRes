@@ -114,16 +114,23 @@ class Analytical:
         if self.coordinates == 'linear':
             if self.dimension == 1:
                 if all(['dirichlet' == cond.lower() for cond in self.cc[0]]):
-                    self.model = 'p1_1D'
+                    self.model = 'p_linear_1D_finito'
                     pressures = []
                     for t in self.time_list:
-                        pressures.append(p1_1D(self.L_list, t, self.pe, self.pw, self.eta, self.L))
+                        pressures.append(p_linear_1D_finito(self.L_list, t, self.pe, self.pw, self.eta, self.L))
             if 'neumann' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][1].lower():
-                self.model = 'p2_1D'
+                self.model = 'p_linear_1D_realimentacao'
                 pressures = []
                 for t in self.time_list:
                     pressures.append(
-                        p2_1D(self.L_list, t, self.p0, self.qw, self.mu, self.L, self.k, self.area, self.phi, self.ct))
+                        p_linear_1D_realimentacao(self.L_list, t, self.p0, self.qw, self.mu, self.L, self.k, self.area, self.phi, self.ct))
+            if all(['neumann' == cond.lower() for cond in self.cc[0]]):
+                self.model = 'p_linear_1D_selado'
+                pressures = []
+                for t in self.time_list:
+                    pressures.append(
+                        p_linear_1D_selado(self.L_list, t, self.p0, self.qw, self.mu, self.L, self.k, self.area, self.phi, self.ct))
+            
         if self.coordinates == 'radial':
             if 'neumann' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][1].lower():
                 self.model = 'p_transiente_1D_radial'
@@ -149,27 +156,33 @@ class Analytical:
 
 
 
-def p1_1D(x, t, pe, pw, eta,L, N=100):
+def p_linear_1D_finito(x, t, pe, pw, L, k, phi, mu, ct, N=100):
+    eta = k / (phi * mu * ct)
     soma = np.zeros_like(x, dtype=float)
-
+    
     for n in range(1, N + 1):
         a = (n * np.pi) / L
-        termo = (np.exp(-(a ** 2) * eta * t) / n) * np.sin(a * x)
+        termo = (np.exp(-(a**2)*eta*t)/n)*np.sin(a*x)
         soma += termo
 
-    p = (pe - pw) * ((x / L) + (2 / np.pi) * soma) + pw
-
+    p = (pe - pw)*((x/L) + (2/np.pi)*soma) + pw
+    
     return p
 
-
-def p2_1D(x, t, p0, qw, mu, L, k, A, phi, ct):
+def p_linear_1D_realimentacao(x, t, p0, qw, mu, L, k, A, phi, ct):
     eta = k / (phi * mu * ct)
-    a = (qw * mu * L) / (k * A)
-    b = 4 * eta * t
+    a = (qw * mu * L)/(k*A)
+    b = 4*eta*t
 
-    p = p0 - a * (np.sqrt(b / (np.pi * L ** 2)) * np.exp(-(x ** 2) / b) - ((x / L) * erfc(x / np.sqrt(b))))
-
+    p = p0 - a*(np.sqrt(b/(np.pi*L**2))*np.exp(-(x**2)/b) - ((x/L)*erfc(x/np.sqrt(b))))
+    
     return p
+
+def p_linear_1D_selado(x, t, p0, qw, mu, L, k, A, phi, ct):
+    a = (mu*qw)/(k*L*A)
+    b = (mu*qw)/(k*A)
+    c = qw/(L*A*phi*ct)
+    return a*(x**2)/2 - b*x + c*t + p0
 
 
 def p_transiente_1D_radial(r, t, p0, qw, mu, h, k, phi, ct):
