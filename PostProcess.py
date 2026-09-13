@@ -239,13 +239,25 @@ def maps_plot(time_list, t_selected, x_pos, p_an, p_an_times, p_explicit, p_impl
     #
     # plt.show()
 
-def error_plots(Erros, dx, dt):
+def error_plots(Erros, dx, dt, units='BR'):
+    if units == "SI":
+        t_unidade = 's'
+        p_unidade = 'Pa'
+        m_unidade = 'm'
+    elif units == 'BR':
+        t_unidade = 'h'
+        p_unidade = 'kgf/cm$^2$'
+        m_unidade = 'm'
+    else:
+        t_unidade = 'h'
+        p_unidade = 'psi'
+        m_unidade = 'ft'
     plt.figure()
     for key, time in zip(list(Erros.keys()), dt):
-        plt.loglog(dx, Erros[key], marker='o', label=f"$\Delta t$ = {time}")
+        plt.loglog(dx, Erros[key], marker='o', label=f"$\Delta t$ = {time} ({t_unidade})")
 
-    plt.xlabel(f'Comprimento Característico - $h(m)$', size=13)
-    plt.ylabel(f"Erro na Pressão", size=13)
+    plt.xlabel(f'Comprimento Característico - $\Delta x$ ({m_unidade})', size=13)
+    plt.ylabel(f'Erro na Pressão ({p_unidade})', size=13)
     plt.grid(True, alpha=0.8,which="both", ls="-")
     plt.legend()
     plt.tight_layout()
@@ -255,11 +267,11 @@ def error_plots(Erros, dx, dt):
     plt.figure()
     for i, h in enumerate(dx):
         erros_h = [Erros[t][i] for t in list(Erros.keys())]
-        plt.loglog(dt, erros_h, marker='o', label=f"$h$ = {h} m")
-    plt.xlabel('Passo de tempo - $\Delta t$(s)', size=13)
-    plt.ylabel('Erro na Pressão', size=13)
+        plt.loglog(dt, erros_h, marker='o', label=f"$h$ = {h} {m_unidade}")
+    plt.xlabel(f'Passo de tempo - $\Delta t$ ({t_unidade})', size=13)
+    plt.ylabel(f'Erro na Pressão ({p_unidade})', size=13)
     plt.grid(True, alpha=0.8, which="both", ls="-")
-    plt.legend(title='Malha Espacial ($h$)')
+    plt.legend(title='Malha Espacial ($h$)',loc='upper center')
     plt.tight_layout()
     plt.title('Impacto do refinamento da malha temporal')
     plt.show()
@@ -283,14 +295,14 @@ def malha_erros(expli,impli,times = None, units='SI'):
         times = expli.times_found
 
     cor = ['indianred', 'navy']
-    plt.figure(dpi=100)
-    plt.title('Malha de Erros', size=15)
-    plt.xlabel(f'Tempo ({t_unidade})', size=13)
+    plt.figure(dpi=120, figsize=(9, 12))
+    plt.title('Erro Global', size=15)
+    plt.xlabel(f'Tempo da simulação ({t_unidade})', size=13)
     plt.ylabel(f'Erro ({p_unidade})', size=13)
     plt.plot(times,expli.Err_RMSE, ls='-',label='RMSE - Método Explícito', color=cor[0])
     plt.plot(times, impli.Err_RMSE, ls='-', label='RMSE - Método Implícito', color=cor[1])
-    plt.plot(times,expli.Err_relative, ls='--',label='Relativo - Método Explícito', color=cor[0])
-    plt.plot(times, impli.Err_relative, ls='--', label='Relativo - Método Implícito', color=cor[1])
+    # plt.plot(times,expli.Err_relative, ls='--',label='Relativo - Método Explícito', color=cor[0])
+    # plt.plot(times, impli.Err_relative, ls='--', label='Relativo - Método Implícito', color=cor[1])
     plt.legend()
     plt.tight_layout()
     plt.grid(True, alpha=0.8)
