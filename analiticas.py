@@ -4,7 +4,7 @@ from scipy.special import expi
 
 # Escoamento Linear
 
-def p1_1D(x, t, pe, pw, L, k, phi, mu, ct, N=100):
+def p_linear_1D_pressoes_prescritas(x, t, pe, pw, L, k, phi, mu, ct, N=100):
     eta = k / (phi * mu * ct)
     soma = np.zeros_like(x, dtype=float)
     
@@ -17,7 +17,7 @@ def p1_1D(x, t, pe, pw, L, k, phi, mu, ct, N=100):
     
     return p
 
-def p2_1D(x, t, p0, qw, mu, L, k, A, phi, ct):
+def p_linear_1D_realimentacao(x, t, p0, qw, mu, L, k, A, phi, ct):
     eta = k / (phi * mu * ct)
     a = (qw * mu * L)/(k*A)
     b = 4*eta*t
@@ -25,6 +25,13 @@ def p2_1D(x, t, p0, qw, mu, L, k, A, phi, ct):
     p = p0 - a*(np.sqrt(b/(np.pi*L**2))*np.exp(-(x**2)/b) - ((x/L)*erfc(x/np.sqrt(b))))
     
     return p
+
+def p_linear_1D_selado(x, t, p0, qw, mu, L, k, A, phi, ct):
+    a = (mu*qw)/(k*L*A)
+    b = (mu*qw)/(k*A)
+    c = qw/(L*A*phi*ct)
+    return a*(x**2)/2 - b*x + c*t + p0
+
 
 def p_transiente_1D_radial(r, t, p0, qw, mu, h, k, phi, ct):
     a = (qw *mu)/(4 * np.pi * k * h)
