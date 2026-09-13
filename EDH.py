@@ -175,12 +175,28 @@ def p_linear_1D_finito(x, t, pe, pw, L, k, phi, mu, ct, N=100):
     return p
 
 def p_linear_1D_realimentacao(x, t, p0, qw, mu, L, k, A, phi, ct):
+    # INFINITO
     eta = k / (phi * mu * ct)
     a = (qw * mu * L)/(k*A)
     b = 4*eta*t
 
     p = p0 - a*(np.sqrt(b/(np.pi*L**2))*np.exp(-(x**2)/b) - ((x/L)*erfc(x/np.sqrt(b))))
     
+    return p
+
+def p_linear_1D_realimentacao_finito(x, t, p0, qw, mu, L, k, A, phi, ct, N=100):
+    # FINITO
+    eta = k / (phi * mu * ct)
+    soma = np.zeros_like(x, dtype=float)
+    for n in range(N):
+        lambda_n = (2 * n + 1) * np.pi / (2 * L)
+        # Termo da série
+        fator_espacial = np.sin(lambda_n * (L - x)) / ((2 * n + 1) ** 2)
+        fator_temporal = np.exp(-(lambda_n ** 2) * eta * t)
+        soma += fator_espacial * fator_temporal
+    termo_estacionario = (qw * mu / (k * A)) * (L - x)
+    termo_transitorio = (8 * qw * mu * L) / (k * A * (np.pi ** 2)) * soma
+    p = p0 - termo_estacionario + termo_transitorio
     return p
 
 def p_linear_1D_selado(x, t, p0, qw, mu, L, k, A, phi, ct):
@@ -388,47 +404,6 @@ class Numerical:
         P_matriz[Nx,:] = self.p0
         b_matriz = np.zeros(self.nx)
 
-        # while t < self.final_time:
-        #     Nx = Nx + 1
-        #     A_matriz = np.zeros((self.nx, self.nx))
-        #
-        #     for i in range(self.nx):
-        #         # Condições de Contorno:
-        #         if i == 0:  # Fronteira esquerda
-        #             if 'dirichlet' == self.cc[0][0].lower():
-        #                 A_matriz[i, i] = 1 + 4 * self.beta * self.theta
-        #                 A_matriz[i, i + 1] = - 4 / 3 * self.beta * self.theta
-        #                 b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i+1]+8/3*self.beta*self.pw
-        #
-        #             elif 'neumann' == self.cc[0][0].lower():
-        #                 A_matriz[i, i] = 1 + self.beta * self.theta
-        #                 A_matriz[i, i + 1] = -self.beta * self.theta
-        #                 b_matriz[i] = (1-self.beta*(1-self.theta))*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i+1] + (self.eta*self.dt*self.Gamma/self.dx) * self.qw
-        #
-        #         elif i == self.nx - 1:  # Fronteira direita
-        #             if 'dirichlet' == self.cc[0][1].lower():
-        #                 A_matriz[i, i - 1] = - 4 / 3 * self.beta * self.theta
-        #                 A_matriz[i, i] =1 + 4 * self.beta * self.theta
-        #                 b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i-1]+8/3*self.beta*self.pe
-        #
-        #             elif 'neumann' == self.cc[0][1].lower():
-        #                 A_matriz[i, i - 1] = -self.beta * self.theta
-        #                 A_matriz[i, i] = 1 + self.beta * self.theta
-        #                 b_matriz[i] = self.beta * (1-self.theta)*P_matriz_old[i-1] + (1-self.beta*(1-self.theta))*P_matriz_old[i] - (self.eta*self.dt*self.Gamma/self.dx) * self.qe
-        #
-        #         else:  # Central
-        #             A_matriz[i, i - 1] = -self.beta*self.theta
-        #             A_matriz[i, i] = 2*self.beta*self.theta + 1
-        #             A_matriz[i, i + 1] = -self.beta*self.theta
-        #             b_matriz[i] = self.beta*(1-self.theta)*P_matriz_old[i+1] +(-2*self.beta*(1-self.theta)+1)*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i-1]
-        #
-        #     # Qual método vai usar...
-        #
-        #     x0 = P_matriz_old # chute inicial
-        #     P_matriz_new = Solve.TDMA(A_matriz, b_matriz)
-        #     P_matriz_old = P_matriz_new.copy()
-        #     t = t + self.dt
-        #     P_matriz[Nx, :] = P_matriz_new
         for n in range(self.nt):
             if n%5 == 0:
                 print(f'Progresso: {n/self.nt*100}%')
@@ -524,6 +499,7 @@ class Numerical:
         self.Err_RMSE = Err_RMSE
         self.E_max_abs = E_max_abs
         self.local_error_grids = local_error_grids
+        self.times_found = times_found
 
     def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None, pos_to_plot: list = None, units: str = 'SI'):
         from PostProcess import plot_p_curves

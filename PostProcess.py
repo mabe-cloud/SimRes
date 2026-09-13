@@ -16,7 +16,7 @@ def plot_p_curves(L :list,pressures:list, time_list:list, title :str = None,xlim
         p_unidade = 'psi'
         m_unidade = 'ft'
 
-    plt.figure(figsize=(9, 6))
+    plt.figure(figsize=(9, 6),dpi=120)
     # if isinstance(pressures, list):
     #     for p,t in zip(pressures,time_list):
     #         plt.plot(L, p, label=f"t = {t} {t_unidade}")
@@ -44,7 +44,7 @@ def plot_p_curves(L :list,pressures:list, time_list:list, title :str = None,xlim
     plt.xlim(xlim)
     if title is not None:
         plt.title(title, size=16)
-    plt.grid(True, alpha=0.3)
+    plt.grid(True, alpha=1)
     plt.legend()
     plt.tight_layout()
     plt.show()
@@ -67,7 +67,7 @@ def plot_p(L: list, Pressures: list, time_list: list, title : str = None, xlim :
         p_unidade = 'psi'
         m_unidade = 'ft'
 
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig, (ax1, ax2) = plt.subplots(1, 2, dpi=120)
     fig.suptitle(f'{title}',size=16)
 
 
@@ -92,6 +92,7 @@ def plot_p(L: list, Pressures: list, time_list: list, title : str = None, xlim :
         #     if any(time_list[i] == time for time in times_to_plot):
         #         ax1.plot(L, Pressures[i], label=f"t = {time_list[i]}{t_unidade}")
     ax1.legend()
+    ax1.grid(visible=True, axis='both')
     ax1.set_title(f'Cortes temporais\ndo reservatório')
     ax1.set_xlabel(f'Posição ({m_unidade})', size=14)
     ax1.set_ylabel(f'Pressão ({p_unidade})', size=14)
@@ -127,6 +128,7 @@ def plot_p(L: list, Pressures: list, time_list: list, title : str = None, xlim :
     ax2.legend()
     ax2.set_title(f'Cortes espaciais\ndo reservatório')
     ax2.set_xlabel(f'Tempo ({t_unidade})', size=14)
+    ax2.grid(visible=True, axis='both')
     plt.show()
 
 def maps_plot(time_list, t_selected, x_pos, p_an, p_an_times, p_explicit, p_implicit, cmap=None, units = 'SI'):
@@ -237,5 +239,59 @@ def maps_plot(time_list, t_selected, x_pos, p_an, p_an_times, p_explicit, p_impl
     #
     # plt.show()
 
-def error_plots():
-    pass
+def error_plots(Erros, dx, dt):
+    plt.figure()
+    for key, time in zip(list(Erros.keys()), dt):
+        plt.loglog(dx, Erros[key], marker='o', label=f"$\Delta t$ = {time}")
+
+    plt.xlabel(f'Comprimento Característico - $h(m)$', size=13)
+    plt.ylabel(f"Erro na Pressão", size=13)
+    plt.grid(True, alpha=0.8,which="both", ls="-")
+    plt.legend()
+    plt.tight_layout()
+    plt.title('Impacto do refinamento da malha espacial')
+    plt.show()
+
+    plt.figure()
+    for i, h in enumerate(dx):
+        erros_h = [Erros[t][i] for t in list(Erros.keys())]
+        plt.loglog(dt, erros_h, marker='o', label=f"$h$ = {h} m")
+    plt.xlabel('Passo de tempo - $\Delta t$(s)', size=13)
+    plt.ylabel('Erro na Pressão', size=13)
+    plt.grid(True, alpha=0.8, which="both", ls="-")
+    plt.legend(title='Malha Espacial ($h$)')
+    plt.tight_layout()
+    plt.title('Impacto do refinamento da malha temporal')
+    plt.show()
+
+def malha_erros(expli,impli,times = None, units='SI'):
+
+    if units == "SI":
+        t_unidade = 's'
+        p_unidade = 'Pa'
+        m_unidade = 'm'
+    elif units == 'BR':
+        t_unidade = 'h'
+        p_unidade = 'kgf/cm$^2$'
+        m_unidade = 'm'
+    else:
+        t_unidade = 'h'
+        p_unidade = 'psi'
+        m_unidade = 'ft'
+
+    if times is None:
+        times = expli.times_found
+
+    cor = ['indianred', 'navy']
+    plt.figure(dpi=100)
+    plt.title('Malha de Erros', size=15)
+    plt.xlabel(f'Tempo ({t_unidade})', size=13)
+    plt.ylabel(f'Erro ({p_unidade})', size=13)
+    plt.plot(times,expli.Err_RMSE, ls='-',label='RMSE - Método Explícito', color=cor[0])
+    plt.plot(times, impli.Err_RMSE, ls='-', label='RMSE - Método Implícito', color=cor[1])
+    plt.plot(times,expli.Err_relative, ls='--',label='Relativo - Método Explícito', color=cor[0])
+    plt.plot(times, impli.Err_relative, ls='--', label='Relativo - Método Implícito', color=cor[1])
+    plt.legend()
+    plt.tight_layout()
+    plt.grid(True, alpha=0.8)
+    plt.show()
