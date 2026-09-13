@@ -117,7 +117,8 @@ class Analytical:
                     self.model = 'p_linear_1D_finito'
                     pressures = []
                     for t in self.time_list:
-                        pressures.append(p_linear_1D_finito(self.L_list, t, self.pe, self.pw, self.eta, self.L))
+
+                        pressures.append(p_linear_1D_finito(self.L_list, t, self.pe, self.pw, self.L, self.k, self.phi, self.mu, self.ct))
             if 'neumann' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][1].lower():
                 self.model = 'p_linear_1D_realimentacao'
                 pressures = []
@@ -147,13 +148,17 @@ class Analytical:
                         p_pseudopermanente_1D_radial(self.R_list, self.Re, self.rw, t, self.p0, self.qe, self.mu, self.h, self.k, self.phi, self.ct))
 
         self.pressures = pressures
-    def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None):
-        from PostProcess import post_process
-        try:
-            post_process(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot)
-        except:
-            post_process(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot)
 
+    def postprocess(self, title: str = None, xlim: list = None, times_to_plot: list = None,
+                        pos_to_plot: list = None, units: str = 'SI'):
+        from PostProcess import plot_p_curves
+        from PostProcess import plot_p
+        try:
+            plot_p_curves(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
+            plot_p(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
+        except:
+            plot_p_curves(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
+            plot_p(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
 
 
 def p_linear_1D_finito(x, t, pe, pw, L, k, phi, mu, ct, N=100):
@@ -343,7 +348,6 @@ class Numerical:
                     self.explicita_1D()
                 if self.theta != 0:
                     self.implicita_1D()
-        self.compute_error()
     def matriz(self):
         """
         Faz a montagem da matriz
@@ -469,39 +473,64 @@ class Numerical:
             P_matriz[n + 1, :] = P_matriz_new
         self.pressures = P_matriz
 
-    def compute_error(self):
-        try:
-            time_list = np.linspace(0, self.final_time, self.nt + 1)
-            analitical = Analytical(self.dimension, self.coordinates, self.ci, self.cc, self.grid, self.system_units)
-            analitical.model_parameters(self.eta, self.k, self.phi, self.mu, self.ct, self.lengths, self.area,
-                         time_list, self.rw)
-            analitical.run()
-            an_pressures = analitical.pressures
-            E_max = 0
-            Err_relativo = []
+    def compute_error(self, analytical, times_to_compute_err : list = None):
+        if times_to_compute_err == None:
+            an_pressures = analytical.pressures
+            an_times = analytical.time_list
+        else:
+            all_an_pressures = analytical.pressures
+            all_an_times = analytical.time_list
+            an_idxs = []
+            an_times = []
+            for selected_time in times_to_compute_err:
+                for idx, time in enumerate(all_an_times):
+                    if time == selected_time:
+                        an_idxs.append(idx)
+                        an_times.append(time)
+            an_pressures = np.array([pressure for pressure, time in zip(all_an_pressures, all_an_times) if time in times_to_compute_err])
+
+        if len(self.pressures[0]) == len(an_pressures[0]) is False:
+            raise IndexError('Há inconformidade entre os tamanhos da malha de pressão numérica e analítica!')
+        # pegar indice certo da numerica e o grid analitico correspondente calcular erros dai
+        numerical_idxs = []
+        times_found = []
+        for an_time in an_times:
+            for idx, time in enumerate(self.time_list):
+                if time == an_time:
+                    numerical_idxs.append(idx)
+                    times_found.append(time)
+        if numerical_idxs == []:
+            raise AttributeError('Não foi possível encontrar tempos correspondentes entre a malha temporal analítica e numérica!')
+        new_an_pressures = np.array([pressure for pressure, time in zip(an_pressures, an_times) if time in times_found])
+        new_num_pressures = np.array([self.pressures[i] for i in numerical_idxs])
+        local_error_grids = new_an_pressures - new_num_pressures
+        E_max_abs = []
+        for err in local_error_grids:
+            E_max_abs.append(np.max(abs(err)))
+        soma = 0
+        Err_relative = []
+        for an, num in zip(new_an_pressures,new_num_pressures):
+            for i in range(len(an)):
+                soma += abs((an[i] - num[i]) / an[i])
+            Err_relative.append(soma)
             soma = 0
-            for n in range(len(self.pressures)):
-                for i in range(len(self.pressures[0])):
-                    soma += abs((an_pressures[n][i] - self.pressures[n][i]) / an_pressures[n][i])
-                    E_max = max(E_max,abs(an_pressures[n][i] - self.pressures[n][i]))
-                Err_relativo.append(soma)
-                soma = 0
-            Err_RMSE = []
-            for n in range(len(self.pressures)):
-                for i in range(len(self.pressures[0])):
-                    soma += abs(an_pressures[n][i] - self.pressures[n][i])**2
-                Err_RMSE.append((soma/len(self.pressures[0]))**(1/2))
-                soma = 0
+        Err_RMSE = []
+        for an, num in zip(new_an_pressures,new_num_pressures):
+            for i in range(len(an)):
+                soma += abs(an[i] - num[i])**2
+            Err_RMSE.append((soma/len(an))**(1/2))
+            soma = 0
+        self.Err_relative = Err_relative
+        self.Err_RMSE = Err_RMSE
+        self.E_max_abs = E_max_abs
+        self.local_error_grids = local_error_grids
 
-
-
-
-        except:
-            print('Não foi encontrada uma solução analítica para computar os erros!')
-
-    def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None):
-        from PostProcess import post_process
+    def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None, pos_to_plot: list = None, units: str = 'SI'):
+        from PostProcess import plot_p_curves
+        from PostProcess import plot_p
         try:
-            post_process(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot)
+            plot_p_curves(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
+            plot_p(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
         except:
-            post_process(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot)
+            plot_p_curves(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
+            plot_p(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
