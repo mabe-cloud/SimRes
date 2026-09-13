@@ -130,7 +130,7 @@ class Analytical:
                 pressures = []
                 for t in self.time_list:
                     pressures.append(
-                        p_linear_1D_selado(self.L_list, t, self.p0, self.qw, self.mu, self.L, self.k, self.area, self.phi, self.ct))
+                        p_linear_1D_realimentacao(x=self.L_list, t=t, p0=self.p0, qw=self.qw, mu=self.mu, L=self.L, k=self.k, A=self.area, phi=self.phi, ct=self.ct))
             
         if self.coordinates == 'radial':
             if 'neumann' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][1].lower():

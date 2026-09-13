@@ -100,7 +100,7 @@ def plot_p(L: list, Pressures: list, time_list: list, title : str = None, xlim :
             p_to_plot = []
             for j in range(len(time_list)):
                 p_to_plot.append(Pressures[j][i])
-            ax2.plot(time_list, p_to_plot, label=f"pos = {x}{m_unidade}")
+            ax2.plot(time_list, p_to_plot, label=f"pos = {int(x)}{m_unidade}")
     else:
         pos_numerical_idxs = []
         pos_found = []
@@ -117,7 +117,7 @@ def plot_p(L: list, Pressures: list, time_list: list, title : str = None, xlim :
             new_num_pressures.append(temp_pressure)
 
         for press, pos in zip(new_num_pressures, pos_found):
-           ax2.plot(time_list, press, label=f"pos = {pos}{m_unidade}")
+           ax2.plot(time_list, press, label=f"pos = {int(pos)}{m_unidade}")
         # for i,x in enumerate(L):
         #     if any(x == pos for pos in pos_to_plot):
         #         p_to_plot = []
