@@ -4,7 +4,7 @@ from scipy.special import expi
 
 # Escoamento Linear
 
-def p_linear_1D_pressoes_prescritas(x, t, pe, pw, L, k, phi, mu, ct, N=100):
+def p_linear_1D_finito(x, t, pe, pw, L, k, phi, mu, ct, N=100):
     eta = k / (phi * mu * ct)
     soma = np.zeros_like(x, dtype=float)
     
