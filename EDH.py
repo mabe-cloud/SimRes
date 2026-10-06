@@ -2,6 +2,10 @@ import numpy as np
 from scipy.special import erfc
 from scipy.special import expi
 from Solvers import Solve
+import matplotlib.pyplot as plt
+from scipy.stats import qmc, lognorm
+import pandas as pd
+import os
 
 class Analytical:
     """
@@ -510,3 +514,45 @@ class Numerical:
         except:
             plot_p_curves(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
             plot_p(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
+
+########################################################################################
+    def mapa_permeabilidade(nx=30, ny=30, mu=0.4, sigma=0.3, file_path='.', file_name='mapa_permeabilidade.csv', plot=True):
+        blocks = nx * ny
+
+        sample = qmc.LatinHypercube(d=1)
+        sample_rand = sample.random(n=blocks)
+
+        permeabilidade_1d = lognorm.ppf(sample_rand, s=sigma, scale=np.exp(mu)).flatten()
+        np.random.shuffle(permeabilidade_1d)
+
+        k_grid = permeabilidade_1d.reshape((ny, nx))
+
+        os.makedirs(file_path, exist_ok=True)
+        csv_path = os.path.join(file_path, file_name)
+
+        df_permeabilidade = pd.DataFrame(k_grid)
+        df_permeabilidade.to_csv(csv_path, index=False, header=False)
+
+        k_fig = None
+    
+        if plot:
+            k_fig, ax = plt.subplots(figsize=(7, 5))
+            im = ax.imshow(k_grid, cmap='jet', aspect='auto', origin='lower', extent=[0, nx, 0, ny])
+        
+            barra_cores = k_fig.colorbar(im, ax=ax)
+            barra_cores.set_label('Permeabilidade (D)')
+        
+            ax.set_title('Distribuição de Permeabilidades')
+            ax.set_xlabel('Blocos X')
+            ax.set_ylabel('Blocos Y')
+            
+            f_name, _ = os.path.splitext(file_name)
+            fig_path = os.path.join(file_path, f"{f_name}.png")
+            
+            k_fig.savefig(fig_path, dpi=300, bbox_inches='tight')
+            
+            #plt.show()
+
+        return k_grid, k_fig
+
+
