@@ -260,12 +260,12 @@ class Numerical:
         if len(grid) != dimension:
             raise ValueError('Há discrepância entre a definição da malha e a dimensão adotada para modelagem!')
 
-        if self.dimension != 1:
-            raise NotImplementedError('Não está implementada a modelagem de problemas com dimensão diferente de 1! ')
+        if self.dimension != 1 and self.dimension != 2:
+            raise NotImplementedError('Não está implementada a modelagem de problemas com dimensão diferente de 1 e 2! ')
 
         self.coordinates = self.coordinates.lower()
 
-    def model_parameters(self, eta: float, k: float, phi: float, mu: float, ct: float, lengths: list, area: float,
+    def model_parameters(self, eta: float, k: float | list, phi: float, mu: float, ct: float, lengths: list, area: float,
                          final_time: float, nt: int, rw=None):
         """
         Define os parâmetros de entrada do modelo.
@@ -303,16 +303,20 @@ class Numerical:
 
         if len(self.grid) == 1:
             self.dx = lengths[0]/self.grid[0]
-        self.beta = (self.eta * self.dt) / (self.dx ** 2)
+        if len(self.grid) == 2:
+            self.dx = lengths[0] / self.grid[0]
+            self.dy = lengths[1] / self.grid[1]
 
-
-        if self.theta == 0:
-            if self.beta > 1 / 2:
-                raise ValueError('Os valores escolhidos para eta, dx e dt não passaram no critério de convergência!')
-        if (0<=self.theta <=1) is False:
-            raise ValueError(f'O valor de theta {self.theta} não pode ser usado!\nEscolha entre 0 e 1!')
-        self.rw = rw
         if self.dimension == 1:
+            self.beta = (self.eta * self.dt) / (self.dx ** 2)
+
+            if self.theta == 0:
+                if self.beta > 1 / 2:
+                    raise ValueError(
+                        'Os valores escolhidos para eta, dx e dt não passaram no critério de convergência!')
+            if (0 <= self.theta <= 1) is False:
+                raise ValueError(f'O valor de theta {self.theta} não pode ser usado!\nEscolha entre 0 e 1!')
+            self.rw = rw
             pos = 0
             for cc_type, value in zip(*self.cc):
                 if pos == 0:
@@ -331,14 +335,21 @@ class Numerical:
                         'Há discrepância entre os índices dos valores das condições de contorno e seus tipos')
                 pos += 1
             if self.coordinates == 'linear':
-                self.L = lengths[0]
+
 
                 if len(self.grid) == 1:
+                    self.L = self.lengths[0]
                     self.nx = self.grid[0]
                     if self.rw is None:
                         self.dx = self.L / self.nx
                     else:
                         self.dx = (self.L-self.rw) / self.nx
+
+                if len(self.grid) == 2:
+                    self.Lx = self.lengths[0]
+                    self.Ly = self.lengths[1]
+                    self.nx = self.grid[0]
+                    self.ny = self.grid[1]
 
                 # talvez apagar isso
                 if self.rw is None:
@@ -358,7 +369,7 @@ class Numerical:
                 else:
                     self.R_list = np.linspace(self.rw, lengths[0], self.grid[0])
 
-        self.Gamma = -self.mu / (self.k * self.area)
+            self.Gamma = -self.mu / (self.k * self.area)
         self.time_list = np.linspace(0, self.final_time, self.nt + 1)
 
     def run(self):
@@ -368,6 +379,11 @@ class Numerical:
                     self.explicita_1D()
                 if self.theta != 0:
                     self.implicita_1D()
+            if self.dimension == 2:
+                if self.theta == 0:
+                    pass
+                if self.theta == 1:
+                    self.implicita_2D()
     def matriz(self):
         """
         Faz a montagem da matriz
@@ -400,6 +416,59 @@ class Numerical:
                     self.pressures[n + 1, i] = self.beta * self.pressures[n, i + 1] + (1 - 2 * self.beta) * self.pressures[n, i] + self.beta * self.pressures[n, i - 1]
 
     def implicita_1D(self):
+        t = 0
+        Nx = 0
+
+        P_matriz_old = np.ones(self.nx)*self.p0 # Pressão inicial do reservatório
+        P_matriz = np.zeros((self.nt+1, self.nx))
+        P_matriz[Nx,:] = self.p0
+        b_matriz = np.zeros(self.nx)
+
+        for n in range(self.nt):
+            if n%5 == 0:
+                print(f'Progresso: {n/self.nt*100}%')
+            Nx = Nx + 1
+            A_matriz = np.zeros((self.nx, self.nx))
+
+            for i in range(self.nx):
+                # Condições de Contorno:
+                if i == 0:  # Fronteira esquerda
+                    if 'dirichlet' == self.cc[0][0].lower():
+                        A_matriz[i, i] = 1 + 4 * self.beta * self.theta
+                        A_matriz[i, i + 1] = - 4 / 3 * self.beta * self.theta
+                        b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i+1]+8/3*self.beta*self.pw
+
+                    elif 'neumann' == self.cc[0][0].lower():
+                        A_matriz[i, i] = 1 + self.beta * self.theta
+                        A_matriz[i, i + 1] = -self.beta * self.theta
+                        b_matriz[i] = (1-self.beta*(1-self.theta))*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i+1] + (self.eta*self.dt*self.Gamma/self.dx) * self.qw
+
+                elif i == self.nx - 1:  # Fronteira direita
+                    if 'dirichlet' == self.cc[0][1].lower():
+                        A_matriz[i, i - 1] = - 4 / 3 * self.beta * self.theta
+                        A_matriz[i, i] =1 + 4 * self.beta * self.theta
+                        b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i-1]+8/3*self.beta*self.pe
+
+                    elif 'neumann' == self.cc[0][1].lower():
+                        A_matriz[i, i - 1] = -self.beta * self.theta
+                        A_matriz[i, i] = 1 + self.beta * self.theta
+                        b_matriz[i] = self.beta * (1-self.theta)*P_matriz_old[i-1] + (1-self.beta*(1-self.theta))*P_matriz_old[i] + (self.eta*self.dt*self.Gamma/self.dx) * self.qe
+
+                else:  # Central
+                    A_matriz[i, i - 1] = -self.beta*self.theta
+                    A_matriz[i, i] = 2*self.beta*self.theta + 1
+                    A_matriz[i, i + 1] = -self.beta*self.theta
+                    b_matriz[i] = self.beta*(1-self.theta)*P_matriz_old[i+1] +(-2*self.beta*(1-self.theta)+1)*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i-1]
+
+            # Qual método vai usar...
+
+            x0 = P_matriz_old # chute inicial
+            P_matriz_new = Solve.TDMA(A_matriz, b_matriz)
+            P_matriz_old = P_matriz_new.copy()
+            P_matriz[n + 1, :] = P_matriz_new
+        self.pressures = P_matriz
+
+    def implicita_2D(self):
         t = 0
         Nx = 0
 
@@ -516,43 +585,39 @@ class Numerical:
             plot_p(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
 
 ########################################################################################
-    def mapa_permeabilidade(nx=30, ny=30, mu=0.4, sigma=0.3, file_path='.', file_name='mapa_permeabilidade.csv', plot=True):
-        blocks = nx * ny
-
-        sample = qmc.LatinHypercube(d=1)
-        sample_rand = sample.random(n=blocks)
-
-        permeabilidade_1d = lognorm.ppf(sample_rand, s=sigma, scale=np.exp(mu)).flatten()
-        np.random.shuffle(permeabilidade_1d)
-
-        k_grid = permeabilidade_1d.reshape((ny, nx))
-
-        os.makedirs(file_path, exist_ok=True)
-        csv_path = os.path.join(file_path, file_name)
-
-        df_permeabilidade = pd.DataFrame(k_grid)
-        df_permeabilidade.to_csv(csv_path, index=False, header=False)
-
-        k_fig = None
-    
-        if plot:
-            k_fig, ax = plt.subplots(figsize=(7, 5))
-            im = ax.imshow(k_grid, cmap='jet', aspect='auto', origin='lower', extent=[0, nx, 0, ny])
-        
-            barra_cores = k_fig.colorbar(im, ax=ax)
-            barra_cores.set_label('Permeabilidade (D)')
-        
-            ax.set_title('Distribuição de Permeabilidades')
-            ax.set_xlabel('Blocos X')
-            ax.set_ylabel('Blocos Y')
-            
-            f_name, _ = os.path.splitext(file_name)
-            fig_path = os.path.join(file_path, f"{f_name}.png")
-            
-            k_fig.savefig(fig_path, dpi=300, bbox_inches='tight')
-            
-            #plt.show()
-
-        return k_grid, k_fig
+def mapa_permeabilidade(nx, ny, k_low, k_up,file_path='.', file_name='mapa_permeabilidade.csv', plot=True):
+    blocks = nx * ny
+    sample = qmc.LatinHypercube(d=1)
+    sample_permiability = sample.random(n=blocks)
+    sample_permiability = qmc.scale(sample_permiability, [k_low], [k_up])
 
 
+    k_grid = sample_permiability.reshape((ny, nx))
+
+    os.makedirs(file_path, exist_ok=True)
+    csv_path = os.path.join(file_path, file_name)
+
+    df_permeabilidade = pd.DataFrame(k_grid)
+    df_permeabilidade.to_csv(csv_path, index=False, header=False)
+
+    k_fig = None
+
+    if plot:
+        k_fig, ax = plt.subplots(figsize=(7, 5))
+        im = ax.imshow(k_grid, cmap='jet', aspect='auto', origin='lower', extent=[0, nx, 0, ny])
+
+        barra_cores = k_fig.colorbar(im, ax=ax)
+        barra_cores.set_label('Permeabilidade (D)')
+
+        ax.set_title('Distribuição de Permeabilidades')
+        ax.set_xlabel('Blocos X')
+        ax.set_ylabel('Blocos Y')
+
+        f_name, _ = os.path.splitext(file_name)
+        fig_path = os.path.join(file_path, f"{f_name}.png")
+
+        k_fig.savefig(fig_path, dpi=300, bbox_inches='tight')
+
+        plt.show()
+
+    return k_grid, k_fig
