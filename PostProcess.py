@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 
 def plot_p_curves(L :list,pressures:list, time_list:list, title :str = None,xlim : list = None, times_to_plot:list = None, units = 'SI'):
@@ -131,6 +132,94 @@ def plot_p(L: list, Pressures: list, time_list: list, title : str = None, xlim :
     ax2.grid(visible=True, axis='both')
     plt.show()
 
+def plot_p2d_map(L: list, Pressures: list, time_list: list, title : str = None, times_to_plot: list = None, units = 'SI', save_path='resultados/mapa_pressoes.gif'):
+    """
+    Plota gráficos de pressão para domínio espacial 2D em um mapa de pressões.
+    """
+
+    if units == "SI":
+        t_unidade = 's'
+        p_unidade = 'Pa'
+        m_unidade = 'm'
+    elif units == 'BR':
+        t_unidade = 'h'
+        p_unidade = 'kgf/cm$^2$'
+        m_unidade = 'm'
+    else:
+        t_unidade = 'h'
+        p_unidade = 'psi'
+        m_unidade = 'ft'
+
+
+    vmin = min(np.min(p_grid) for p_grid in Pressures)
+    vmax = max(np.max(p_grid) for p_grid in Pressures)
+
+    idxs = []
+    times_found = []
+    for selected_time in times_to_plot:
+        for idx, time in enumerate(time_list):
+            if time == selected_time:
+                idxs.append(idx)
+                times_found.append(time)
+
+    for pressure, time in zip(Pressures, time_list):
+        if time in times_found:
+            p_fig, ax = plt.subplots(figsize=(7, 5))
+            im = ax.imshow(pressure,cmap='jet',aspect='auto',origin='upper',extent=[0, L[0][-1], 0, L[1][-1]],
+                       vmin=vmin,vmax=vmax)
+            barra_cores = p_fig.colorbar(im, ax=ax)
+            barra_cores.set_label(f'Pressão ({p_unidade})')
+            ax.set_title(f'{title} — t = {time:g} {t_unidade}')
+            ax.set_xlabel(f'Posição X ({m_unidade})')
+            ax.set_ylabel(f'Posição Y ({m_unidade})')
+            plt.show()
+
+
+def plot_p2d_3Dsurface(L: list, Pressures: list, time_list: list, title : str = None, times_to_plot: list = None, units = 'SI', save_path='resultados/mapa_pressoes.gif'):
+    """
+    Plota gráficos de pressão para domínio espacial 2D em uma superfície 3D.
+    """
+
+    if units == "SI":
+        t_unidade = 's'
+        p_unidade = 'Pa'
+        m_unidade = 'm'
+    elif units == 'BR':
+        t_unidade = 'h'
+        p_unidade = 'kgf/cm$^2$'
+        m_unidade = 'm'
+    else:
+        t_unidade = 'h'
+        p_unidade = 'psi'
+        m_unidade = 'ft'
+
+
+    vmin = min(np.min(p_grid) for p_grid in Pressures)
+    vmax = max(np.max(p_grid) for p_grid in Pressures)
+
+    idxs = []
+    times_found = []
+    for selected_time in times_to_plot:
+        for idx, time in enumerate(time_list):
+            if time == selected_time:
+                idxs.append(idx)
+                times_found.append(time)
+    X, Y = np.meshgrid(L[0], L[1])
+    for pressure, time in zip(Pressures, time_list):
+        if time in times_found:
+
+            p_fig = plt.figure(figsize=(13, 13))
+            ax = p_fig.add_subplot(111, projection='3d')
+            surf = ax.plot_surface(X, Y, pressure, cmap='jet', vmin=vmin, vmax=vmax)
+            ax.set_xlabel(f'Posição X ({m_unidade})')
+            ax.set_ylabel(f'Posição Y ({m_unidade})')
+            ax.set_zlabel(f'Pressão ({p_unidade})')
+            ax.view_init(elev=30, azim=55)
+            plt.title(f'{title} — t = {time:g} {t_unidade}')
+            p_fig.colorbar(surf, shrink=0.5, aspect=10)
+            ax.view_init(elev=30, azim=245)
+            plt.show()
+
 def maps_plot(time_list, t_selected, x_pos, p_an, p_an_times, p_explicit, p_implicit, cmap=None, units = 'SI'):
     """
     Plota mapas comparativos para tempos específicos.
@@ -238,6 +327,73 @@ def maps_plot(time_list, t_selected, x_pos, p_an, p_an_times, p_explicit, p_impl
     # fig.colorbar(cor, cax=cbar_ax, label=f"Pressão ({p_unidade})")
     #
     # plt.show()
+
+def maps_plot_2D(time_list, t_selected, L_list, Pressures, cmap=None, units = 'SI'):
+    """
+    Plota mapas comparativos para tempos específicos do mapa de pressões 2D.
+    """
+
+    if units == "SI":
+        t_unidade = 's'
+        p_unidade = 'Pa'
+        m_unidade = 'm'
+    elif units == 'BR':
+        t_unidade = 'h'
+        p_unidade = 'kgf/cm$^2$'
+        m_unidade = 'm'
+    else:
+        t_unidade = 'h'
+        p_unidade = 'psi'
+        m_unidade = 'ft'
+
+
+    vmin = min(np.min(p_grid) for p_grid in Pressures)
+    vmax = max(np.max(p_grid) for p_grid in Pressures)
+    if cmap is None:
+        mapa = "YlGnBu"
+    else:
+        mapa = cmap
+
+    idxs = []
+    times_found = []
+    for selected_time in t_selected:
+        for idx, time in enumerate(time_list):
+            if time == selected_time:
+                idxs.append(idx)
+                times_found.append(time)
+
+    n_plots = len(times_found)
+
+    if n_plots == 0:
+        raise Exception("Nenhum dos tempos selecionados foi encontrado.")
+
+    n_cols = 2 if n_plots == 4 else min(3, n_plots)
+    n_rows = (n_plots - 1) // n_cols + 1
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), sharex=True, sharey=True)
+    if n_plots == 1:
+        axes = np.array([[axes]])
+    elif n_rows == 1:
+        axes = axes.reshape(1, -1)
+    elif n_cols == 1:
+        axes = axes.reshape(-1, 1)
+    idx_plot = 0
+    for pressure, time in zip(Pressures, time_list):
+        if time in times_found:
+                i = idx_plot // n_cols
+                j = idx_plot % n_cols
+                ax = axes[i, j]
+                cor = ax.imshow(pressure, cmap=mapa, aspect='auto', origin='upper',
+                                extent=[0, L_list[0][-1], 0, L_list[1][-1]], vmin=vmin, vmax=vmax)
+                ax.set_title(f'Tempo - t = {time}{t_unidade}', fontsize=12)
+                ax.set_xlabel(f'Posição X ({m_unidade})', fontsize=12)
+                ax.set_ylabel(f'Posição Y ({m_unidade})', fontsize=12)
+                idx_plot += 1
+    fig.subplots_adjust(right=0.85, top=0.915, bottom=0.08)
+    cbar_ax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
+    fig.colorbar(cor, cax=cbar_ax, label=f"Pressão ({p_unidade})")
+    fig.suptitle('Evolução temporal do campo de pressões 2D',size=16)
+    plt.show()
 
 def error_plots(Erros, dx, dt, units='BR'):
     if units == "SI":

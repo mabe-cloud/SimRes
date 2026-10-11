@@ -117,7 +117,7 @@ p.error_plots(Erros,dx, dt)
 
 qw = qw_std*B
 
-t_list = [0.1, 0.3, 0.5, 1, 3, 5, 7, 10]
+t_list = [0.1, 0.3, 0.5, 1, 3, 5, 7, 10, 50]
 tempos = np.linspace(0, t_list[-1], 501)
 NX = 80
 NT = 5000
@@ -286,37 +286,3 @@ for Nt in NTs:
     Erros[Nt] = temp_erro
 
 p.error_plots(Erros,dx, dt)"""
-
-# Dados do problema
-p0 = 300 #kgf/cm^2
-pe = p0 #kgf/cm^2
-pw = 150 #kgf/cm^2
-qw_std = 400 # m^3 std / dia
-q_e = 0
-B = 1.2 # m^3 / m^3 std
-Lx = 100 #m
-Ly = 100 #m
-w = 200 #m
-h = 20 #m
-A = w*h #m^2
-k = 20 #mD
-phi = 0.18
-mu = 0.8 #cP
-ct = 150e-6 #(kgf/cm^2)^-1
-eta = k / (phi * mu * ct)
-nx = 30
-ny = 30
-k_grid, _ = EDH.mapa_permeabilidade(nx, ny, k_low=0.400, k_up=0.650)
-
-# Caso 1 - Pressão-Pressão
-
-t_list = [10]
-
-tempos = np.linspace(0, t_list[-1], 501)
-NX = 30
-NY = 30
-NT = 5000
-
-p2_implicita = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['dirichlet', 'dirichlet'],[pw, pe]], grid=[NX, NY],theta=1, system_units='BR')
-p2_implicita.model_parameters(eta=eta, k=k, phi=phi, mu=mu, ct=ct, lengths=[Lx, Ly],area=A, final_time=t_list[-1], nt=NT)
-p2_implicita.run()

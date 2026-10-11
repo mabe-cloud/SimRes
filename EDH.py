@@ -290,7 +290,7 @@ class Numerical:
         final_time : tempo final que a modelagem vai atingir
             Define o tempo em que será feita a modelagem.
         """
-        if eta is None:
+        if eta is None and k is float:
             self.eta = k / (phi * mu * ct)
         else:
             self.eta = eta
@@ -345,12 +345,6 @@ class Numerical:
                     else:
                         self.dx = (self.L-self.rw) / self.nx
 
-                if len(self.grid) == 2:
-                    self.Lx = self.lengths[0]
-                    self.Ly = self.lengths[1]
-                    self.nx = self.grid[0]
-                    self.ny = self.grid[1]
-
                 # talvez apagar isso
                 if self.rw is None:
                     self.L_list = np.linspace(self.dx / 2, self.L - self.dx / 2, self.nx)
@@ -370,6 +364,50 @@ class Numerical:
                     self.R_list = np.linspace(self.rw, lengths[0], self.grid[0])
 
             self.Gamma = -self.mu / (self.k * self.area)
+        if self.dimension == 2:
+            self.beta = 1/(self.phi * self.mu * self.ct)
+            if self.theta != 1:
+                raise ValueError(f'O valor de theta {self.theta} não pode ser usado!\nEscolha 1!')
+
+            pos = 0
+            for cc_type, value in zip(*self.cc):
+                if pos == 0:
+                    if 'dirichlet' == cc_type.lower():
+                        self.pw = value
+                    if 'neumann' == cc_type.lower():
+                        self.qw = value
+                elif pos == 1:
+                    if 'dirichlet' == cc_type.lower():
+                        self.pe = value
+                    if 'neumann' == cc_type.lower():
+                        self.qe = value
+                elif pos == 2:
+                    if 'dirichlet' == cc_type.lower():
+                        self.pn = value
+                    if 'neumann' == cc_type.lower():
+                        self.qn = value
+                elif pos == 3:
+                    if 'dirichlet' == cc_type.lower():
+                        self.ps = value
+                    if 'neumann' == cc_type.lower():
+                        self.qs = value
+                else:
+                    raise IndexError(
+                        'Há discrepância entre os índices dos valores das condições de contorno e seus tipos')
+                pos += 1
+
+            if self.coordinates == 'linear':
+                if len(self.grid) == 2:
+                    self.Lx = self.lengths[0]
+                    self.Ly = self.lengths[1]
+                    self.nx = self.grid[0]
+                    self.ny = self.grid[1]
+                    self.dx = self.Lx / (self.nx - 1)
+                    self.dy = self.Ly / (self.ny - 1)
+                    self.rx = self.dt / self.dx ** 2
+                    self.ry = self.dt / self.dy ** 2
+                    self.L_list = [np.linspace(self.dx / 2, self.Lx - self.dx / 2, self.nx),np.linspace(self.dy / 2, self.Ly - self.dy / 2, self.ny)]
+
         self.time_list = np.linspace(0, self.final_time, self.nt + 1)
 
     def run(self):
@@ -382,15 +420,8 @@ class Numerical:
             if self.dimension == 2:
                 if self.theta == 0:
                     pass
-                if self.theta == 1:
+                if self.theta != 0:
                     self.implicita_2D()
-    def matriz(self):
-        """
-        Faz a montagem da matriz
-        """
-        pass
-        # if self.dimension == 1:
-        #     if self.coordinates == 'linear':
 
     def explicita_1D(self):
         self.pressures = np.zeros((self.nt + 1, self.nx))
@@ -470,56 +501,288 @@ class Numerical:
 
     def implicita_2D(self):
         t = 0
-        Nx = 0
-
-        P_matriz_old = np.ones(self.nx)*self.p0 # Pressão inicial do reservatório
-        P_matriz = np.zeros((self.nt+1, self.nx))
-        P_matriz[Nx,:] = self.p0
-        b_matriz = np.zeros(self.nx)
+        P_grid = []
+        P_matriz_old = np.ones(self.nx*self.ny)*self.p0 # Pressão inicial do reservatório
+        P_matriz = np.zeros((self.nt+1, self.nx*self.ny))
+        P_matriz[0,:] = self.p0
+        P_grid.append(P_matriz[0].reshape((self.ny, self.nx)))
+        b_matriz = np.zeros(self.nx*self.ny)
 
         for n in range(self.nt):
             if n%5 == 0:
                 print(f'Progresso: {n/self.nt*100}%')
-            Nx = Nx + 1
-            A_matriz = np.zeros((self.nx, self.nx))
+            A_matriz = np.zeros((self.nx*self.ny, self.nx*self.ny))
 
-            for i in range(self.nx):
-                # Condições de Contorno:
-                if i == 0:  # Fronteira esquerda
-                    if 'dirichlet' == self.cc[0][0].lower():
-                        A_matriz[i, i] = 1 + 4 * self.beta * self.theta
-                        A_matriz[i, i + 1] = - 4 / 3 * self.beta * self.theta
-                        b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i+1]+8/3*self.beta*self.pw
+            # Central
+            for i in range(1, self.ny - 1):
+                for j in range(i * self.nx + 1, (i + 1) * self.nx - 1):
+                    k_row = j // self.nx +1
+                    k_col = j % self.nx +1
+                    k_east = 2/(1/self.k[k_row, k_col] + 1/self.k[k_row, k_col + 1])
+                    k_west = 2/(1/self.k[k_row, k_col] + 1/self.k[k_row, k_col - 1])
+                    k_north = 2/(1/self.k[k_row - 1, k_col] + 1/self.k[k_row, k_col])
+                    k_south = 2/(1/self.k[k_row + 1, k_col] + 1/self.k[k_row, k_col])
+                    A_matriz[j, j] = self.theta*(self.beta*self.rx*(k_east+k_west)+
+                                                 self.beta*self.ry*(k_south+k_north)) + 1  # Ap
+                    A_matriz[j, j - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                    A_matriz[j, j + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                    A_matriz[j, j - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                    A_matriz[j, j + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                    b_matriz[j] = ((1-self.theta)*self.beta*(self.rx*(k_east*P_matriz_old[j+1]+k_west*P_matriz_old[j-1])
+                                    +self.ry*(k_south*P_matriz_old[j+self.nx]+k_north*P_matriz_old[j-self.nx]))+
+                                   ((1-self.theta)*(self.beta*(self.rx*(-k_east-k_west)+self.ry*(-k_south-k_north)))+1)*P_matriz_old[j])  # Fonte
 
-                    elif 'neumann' == self.cc[0][0].lower():
-                        A_matriz[i, i] = 1 + self.beta * self.theta
-                        A_matriz[i, i + 1] = -self.beta * self.theta
-                        b_matriz[i] = (1-self.beta*(1-self.theta))*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i+1] + (self.eta*self.dt*self.Gamma/self.dx) * self.qw
+            # Fronteira Norte
+            for i in range(1, self.nx - 1):
+                k_row = 1
+                k_col = i+1
+                k_east = 2/(1/self.k[k_row, k_col] + 1/self.k[k_row, k_col + 1])
+                k_west = 2/(1/self.k[k_row, k_col] + 1/self.k[k_row, k_col - 1])
+                k_north = 2/(1/self.k[k_row - 1, k_col] + 1/self.k[k_row, k_col])
+                k_south = 2/(1/self.k[k_row + 1, k_col] + 1/self.k[k_row, k_col])
+                if 'dirichlet' == self.cc[0][2].lower():
+                    A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_east+k_west)+self.ry*(3*k_north+k_south)) + 1  # Ap
+                    A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                    A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                    A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*(1/3*k_north+k_south) # As
+                    b_matriz[i] = (1-self.theta)*(self.beta*(self.rx*(k_east*P_matriz_old[i+1]+k_west*P_matriz_old[i-1])+ self.ry*(1/3*k_north+k_south)*P_matriz_old[self.nx+i]
+                                                  +(self.rx*(-k_east-k_west)+self.ry*(-3*k_north-k_south))*P_matriz_old[i]))+P_matriz_old[i]+8/3*self.beta*self.ry*k_north*self.cc[1][2]  # Fonte
 
-                elif i == self.nx - 1:  # Fronteira direita
-                    if 'dirichlet' == self.cc[0][1].lower():
-                        A_matriz[i, i - 1] = - 4 / 3 * self.beta * self.theta
-                        A_matriz[i, i] =1 + 4 * self.beta * self.theta
-                        b_matriz[i] = (1-4*self.beta*(1-self.theta))*P_matriz_old[i] + 4/3*self.beta*(1-self.theta)*P_matriz_old[i-1]+8/3*self.beta*self.pe
+                elif 'neumann' == self.cc[0][2].lower():
+                    A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_west+k_east)+self.ry*(k_south))+1  # Ap
+                    A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                    A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                    A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                    b_matriz[i] = (1-self.theta)*(self.beta*(self.rx*(k_east*P_matriz_old[i+1]+k_west*P_matriz_old[i-1])+self.ry*(k_south*P_matriz_old[self.nx+i])
+                                                  +(self.rx*(-k_east-k_west)+self.ry*(-k_south)))*P_matriz_old[i])+P_matriz_old[i]  # Fonte
 
-                    elif 'neumann' == self.cc[0][1].lower():
-                        A_matriz[i, i - 1] = -self.beta * self.theta
-                        A_matriz[i, i] = 1 + self.beta * self.theta
-                        b_matriz[i] = self.beta * (1-self.theta)*P_matriz_old[i-1] + (1-self.beta*(1-self.theta))*P_matriz_old[i] + (self.eta*self.dt*self.Gamma/self.dx) * self.qe
+            # Fronteira Sul
+            for i in range((self.ny - 1) * self.nx + 1, self.ny * self.nx - 1):
+                k_row = i // self.nx + 1
+                k_col = i % self.nx + 1
+                k_east = 2/(1/self.k[k_row, k_col] + 1/self.k[k_row, k_col + 1])
+                k_west = 2/(1/self.k[k_row, k_col] + 1/self.k[k_row, k_col - 1])
+                k_north = 2/(1/self.k[k_row - 1, k_col] + 1/self.k[k_row, k_col])
+                k_south = 2/(1/self.k[k_row + 1, k_col] + 1/self.k[k_row, k_col])
+                if 'dirichlet' == self.cc[0][3].lower():
+                    A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_east + k_west)+self.ry*(k_north + 3*k_south)) + 1  # Ap
+                    A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                    A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                    A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*(k_north + k_south/3)  # An
+                    b_matriz[i] = P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*(k_east*P_matriz_old[i+1]+ k_west*P_matriz_old[i-1]-(k_east+k_west)*P_matriz_old[i])+
+                                    self.ry*((k_north+k_south/3)*P_matriz_old[i-self.nx]-(k_north+3*k_south)*P_matriz_old[i]))+8/3*self.beta*self.ry*k_south*self.cc[1][3]  # Fonte
+                elif 'neumann' == self.cc[0][3].lower():
+                    A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_west+k_east)+self.ry*k_north) + 1  # Ap
+                    A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                    A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                    A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                    b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*(k_east*P_matriz_old[i+1]+k_west*P_matriz_old[i-1]
+                                    -(k_east+k_west)*P_matriz_old[i])+self.ry*k_north*(P_matriz_old[i-self.nx]-P_matriz_old[i])))  # Fonte
+            # Fronteira Leste
+            for i in range(2 * self.nx - 1, (self.ny - 1) * self.nx, self.nx):
+                k_row = i // self.nx +1
+                k_col = i % self.nx +1
+                k_east = 2/(1/self.k[k_row, k_col] + 1/self.k[k_row, k_col + 1])
+                k_west = 2/(1/self.k[k_row, k_col] + 1/self.k[k_row, k_col - 1])
+                k_north = 2/(1/self.k[k_row - 1, k_col] + 1/self.k[k_row, k_col])
+                k_south = 2/(1/self.k[k_row + 1, k_col] + 1/self.k[k_row, k_col])
+                if 'dirichlet' == self.cc[0][1].lower():
+                    A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_west+3*k_east)+self.ry*(k_north+k_south)) + 1  # Ap
+                    A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*(k_west+k_east/3)  # Aw
+                    A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                    A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                    b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_west+k_east/3)*P_matriz_old[i-1]-(k_west+3*k_east)*P_matriz_old[i])
+                                    +self.ry*(k_north*P_matriz_old[i-self.nx]+k_south*P_matriz_old[i+self.nx]-(k_north+k_south)*P_matriz_old[i]))+ 8/3*self.beta*self.rx*k_east*self.cc[1][1])  # Fonte
+                elif 'neumann' == self.cc[0][1].lower():
+                    A_matriz[i, i] = self.theta*self.beta*(self.rx*k_west+self.ry*(k_north+k_south)) + 1  # Ap
+                    A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                    A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                    A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                    b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_west*(P_matriz_old[i-1]-P_matriz_old[i])+ self.ry*(k_north*P_matriz_old[i-self.nx]
+                            +k_south*P_matriz_old[i+self.nx]-(k_north+k_south)*P_matriz_old[i])))  # Fonte
 
-                else:  # Central
-                    A_matriz[i, i - 1] = -self.beta*self.theta
-                    A_matriz[i, i] = 2*self.beta*self.theta + 1
-                    A_matriz[i, i + 1] = -self.beta*self.theta
-                    b_matriz[i] = self.beta*(1-self.theta)*P_matriz_old[i+1] +(-2*self.beta*(1-self.theta)+1)*P_matriz_old[i] + self.beta*(1-self.theta)*P_matriz_old[i-1]
+            # Fronteira Oeste
+            for i in range(self.nx, (self.ny - 2) * self.nx + 1, self.nx):
+                k_row = i // self.nx + 1
+                k_col = i % self.nx + 1
+                k_east = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col + 1])
+                k_west = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col - 1])
+                k_north = 2 / (1 / self.k[k_row - 1, k_col] + 1 / self.k[k_row, k_col])
+                k_south = 2 / (1 / self.k[k_row + 1, k_col] + 1 / self.k[k_row, k_col])
+                if 'dirichlet' == self.cc[0][0].lower():
+                    A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_east+3*k_west)+ self.ry*(k_north+k_south)) + 1  # Ap
+                    A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*(k_east+k_west/3)  # Ae
+                    A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                    A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                    b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_east+k_west/3)*P_matriz_old[i+1]-(k_east+3*k_west)*P_matriz_old[i])
+                        +self.ry*(k_north*P_matriz_old[i-self.nx]+k_south*P_matriz_old[i+self.nx]-(k_north+k_south)*P_matriz_old[i]))+ 8/3*self.beta*self.rx*k_west*self.cc[1][0])  # Fonte
+                elif 'neumann' == self.cc[0][0].lower():
+                    A_matriz[i, i] = self.theta*self.beta*(self.rx*k_east+self.ry*(k_north+k_south))+1  # Ap
+                    A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                    A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                    A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                    b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_east*(P_matriz_old[i+1]-P_matriz_old[i])
+                        + self.ry*(k_north*P_matriz_old[i-self.nx]+k_south*P_matriz_old[i+self.nx]-(k_north+k_south)*P_matriz_old[i])))  # Fonte
 
-            # Qual método vai usar...
+            # Canto Superior Direito
+            i = self.nx - 1
+            k_row = i // self.nx + 1
+            k_col = i % self.nx + 1
+            k_east = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col + 1])
+            k_west = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col - 1])
+            k_north = 2 / (1 / self.k[k_row - 1, k_col] + 1 / self.k[k_row, k_col])
+            k_south = 2 / (1 / self.k[k_row + 1, k_col] + 1 / self.k[k_row, k_col])
+            if 'dirichlet' == self.cc[0][1].lower() and 'dirichlet' == self.cc[0][2].lower():
+                # Dirichlet em east e dirichlet em north
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*(3*k_east+k_west)+ self.ry*(3*k_north+k_south)) + 1  # Ap
+                A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*(k_west+k_east/3)  # Aw
+                A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*(k_south+k_north/3)  # As
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_west+k_east/3)*P_matriz_old[i-1]-(3*k_east+k_west)*P_matriz_old[i])
+                    +self.ry*((k_south+k_north/3)*P_matriz_old[i+self.nx]-(3*k_north+k_south)*P_matriz_old[i]))+8/3*self.beta*(self.rx*k_east*self.cc[1][1]+self.ry*k_north*self.cc[1][2]))  # Fonte
+            elif 'neumann' == self.cc[0][1].lower() and 'dirichlet' == self.cc[0][2].lower():
+                # Neumann em east e dirichlet em north
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*k_west+ self.ry*(3*k_north+k_south)) + 1  # Ap
+                A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*(k_south+k_north/3)  # As
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_west*(P_matriz_old[i-1]-P_matriz_old[i])+self.ry*((k_south+k_north/3)*P_matriz_old[i+self.nx]
+                        -(3*k_north+k_south)*P_matriz_old[i]))+8/3*self.beta*self.ry*k_north*self.cc[1][2])  # Fonte
+            elif 'dirichlet' == self.cc[0][1].lower() and 'neumann' == self.cc[0][2].lower():
+                # Dirichlet em east e neumann em north
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*(3*k_east+k_west)+self.ry*k_south) + 1  # Ap
+                A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*(k_west+k_east/3)  # Aw
+                A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_west+k_east/3)*P_matriz_old[i-1]
+                        -(3*k_east+k_west)*P_matriz_old[i])+self.ry*k_south*(P_matriz_old[i+self.nx]-P_matriz_old[i]))+ 8/3*self.beta*self.rx*k_east*self.cc[1][1])  # Fonte
+            elif 'neumann' == self.cc[0][1].lower() and 'neumann' == self.cc[0][2].lower():
+                # Neumann em east e neumann em north
+                A_matriz[i, i] = self.theta*self.beta*(
+                    self.rx*k_west + self.ry*k_south
+                ) + 1  # Ap
+                A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_west*(P_matriz_old[i-1]-P_matriz_old[i])
+                    +self.ry*k_south*(P_matriz_old[i+self.nx]-P_matriz_old[i])))  # Fonte
+
+            # Canto Superior Esquerdo
+            i = 0
+            k_row = i // self.nx + 1
+            k_col = i % self.nx + 1
+            k_east = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col + 1])
+            k_west = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col - 1])
+            k_north = 2 / (1 / self.k[k_row - 1, k_col] + 1 / self.k[k_row, k_col])
+            k_south = 2 / (1 / self.k[k_row + 1, k_col] + 1 / self.k[k_row, k_col])
+            if 'dirichlet' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][2].lower():
+                # Dirichlet em west e dirichlet em north
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_east+3*k_west)+self.ry*(3*k_north+k_south)) + 1  # Ap
+                A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*(k_east+k_west/3)  # Ae
+                A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*(k_south+k_north/3)  # As
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_east+k_west/3)*P_matriz_old[i+1]-(k_east+3*k_west)*P_matriz_old[i])
+                    +self.ry*((k_south+k_north/3)*P_matriz_old[i+self.nx]-(3*k_north+k_south)*P_matriz_old[i]))+ 8/3*self.beta*(self.rx*k_west*self.cc[1][0]+ self.ry*k_north*self.cc[1][2]))  # Fonte
+            elif 'neumann' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][2].lower():
+                # Neumann em west e dirichlet em north
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*k_east+self.ry*(3*k_north+k_south)) + 1 # Ap
+                A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*(k_south+k_north/3)  # As
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_east*(P_matriz_old[i+1]-P_matriz_old[i])+self.ry*(
+                        (k_south+k_north/3)*P_matriz_old[i+self.nx]-(3*k_north+k_south)*P_matriz_old[i]))+8/3*self.beta*self.ry*k_north*self.cc[1][2])  # Fonte
+            elif 'dirichlet' == self.cc[0][0].lower() and 'neumann' == self.cc[0][2].lower():
+                # Dirichlet em west e neumann em north
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_east+3*k_west)+ self.ry*k_south) + 1  # Ap
+                A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*(k_east+k_west/3)  # Ae
+                A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_east+k_west/3)*P_matriz_old[i+1]-(k_east+3*k_west)*P_matriz_old[i])
+                    +self.ry*k_south*(P_matriz_old[i+self.nx]-P_matriz_old[i]))+8/3*self.beta*self.rx*k_west*self.cc[1][0])  # Fonte
+            elif 'neumann' == self.cc[0][0].lower() and 'neumann' == self.cc[0][2].lower():
+                # Neumann em west e neumann em north
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*k_east + self.ry*k_south) + 1  # Ap
+                A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                A_matriz[i, i + self.nx] = -self.theta*self.beta*self.ry*k_south  # As
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_east*(P_matriz_old[i+1]-P_matriz_old[i])
+                    +self.ry*k_south*(P_matriz_old[i+self.nx]-P_matriz_old[i])))  # Fonte
+
+
+            # Canto Inferior Direito
+            i = self.ny * self.nx - 1
+            k_row = i // self.nx + 1
+            k_col = i % self.nx + 1
+            k_east = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col + 1])
+            k_west = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col - 1])
+            k_north = 2 / (1 / self.k[k_row - 1, k_col] + 1 / self.k[k_row, k_col])
+            k_south = 2 / (1 / self.k[k_row + 1, k_col] + 1 / self.k[k_row, k_col])
+            if 'dirichlet' == self.cc[0][1].lower() and 'dirichlet' == self.cc[0][3].lower():
+                # Dirichlet em east e dirichlet em south
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_west+3*k_east)+self.ry*(k_north+3*k_south)) + 1  # Ap
+                A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*(k_west+k_east/3)  # Aw
+                A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*(k_north+k_south/3)  # An
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_west+k_east/3)*P_matriz_old[i-1]-(k_west+3*k_east)*P_matriz_old[i])
+                    +self.ry*((k_north+k_south/3)*P_matriz_old[i-self.nx]-(k_north+3*k_south)*P_matriz_old[i]))+ 8/3*self.beta*(self.rx*k_east*self.cc[1][1]+self.ry*k_south*self.cc[1][3]))  # Fonte
+            elif 'neumann' == self.cc[0][1].lower() and 'dirichlet' == self.cc[0][3].lower():
+                # Neumann em east e dirichlet em south
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*k_west+self.ry*(k_north+3*k_south)) + 1  # Ap
+                A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*(k_north+k_south/3)  # An
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_west*(P_matriz_old[i-1]-P_matriz_old[i])
+                    + self.ry*((k_north+k_south/3)*P_matriz_old[i-self.nx]-(k_north+3*k_south)*P_matriz_old[i]))+8/3*self.beta*self.ry*k_south*self.cc[1][3])  # Fonte
+            elif 'dirichlet' == self.cc[0][1].lower() and 'neumann' == self.cc[0][3].lower():
+                # Dirichlet em east e neumann em south
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_west+3*k_east)+self.ry*k_north) + 1  # Ap
+                A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*(k_west+k_east/3)  # Aw
+                A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_west+k_east/3)*P_matriz_old[i-1]-(k_west+3*k_east)*P_matriz_old[i])
+                    + self.ry*k_north*(P_matriz_old[i-self.nx]-P_matriz_old[i]))+8/3*self.beta*self.rx*k_east*self.cc[1][1])  # Fonte
+            elif 'neumann' == self.cc[0][1].lower() and 'neumann' == self.cc[0][3].lower():
+                # Neumann em east e neumann em south
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*k_west+self.ry*k_north) + 1  # Ap
+                A_matriz[i, i - 1] = -self.theta*self.beta*self.rx*k_west  # Aw
+                A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_west*(P_matriz_old[i-1]-P_matriz_old[i])
+                    + self.ry*k_north*(P_matriz_old[i-self.nx]-P_matriz_old[i])))  # Fonte
+
+            # Canto Inferior Esquerdo
+            i = (self.ny - 1) * self.nx
+            k_row = i // self.nx + 1
+            k_col = i % self.nx + 1
+            k_east = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col + 1])
+            k_west = 2 / (1 / self.k[k_row, k_col] + 1 / self.k[k_row, k_col - 1])
+            k_north = 2 / (1 / self.k[k_row - 1, k_col] + 1 / self.k[k_row, k_col])
+            k_south = 2 / (1 / self.k[k_row + 1, k_col] + 1 / self.k[k_row, k_col])
+            if 'dirichlet' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][3].lower():
+                # Dirichlet em west e dirichlet em south
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_east+3*k_west)+self.ry*(k_north+3*k_south)) + 1  # Ap
+                A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*(k_east+k_west/3)  # Ae
+                A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*(k_north+k_south/3)  # An
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_east+k_west/3)*P_matriz_old[i+1]-(k_east+3*k_west)*P_matriz_old[i])
+                    + self.ry*((k_north+k_south/3)*P_matriz_old[i-self.nx]-(k_north+3*k_south)*P_matriz_old[i]))+ 8/3*self.beta*(self.rx*k_west*self.cc[1][0]+ self.ry*k_south*self.cc[1][3]))  # Fonte
+            if 'neumann' == self.cc[0][0].lower() and 'dirichlet' == self.cc[0][3].lower():
+                # Neumann em west e dirichlet em south
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*k_east+self.ry*(k_north+3*k_south)) + 1  # Ap
+                A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*(k_north+k_south/3)  # An
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_east*(P_matriz_old[i+1]-P_matriz_old[i])
+                    + self.ry*((k_north+k_south/3)*P_matriz_old[i-self.nx]-(k_north+3*k_south)*P_matriz_old[i]))+8/3*self.beta*self.ry*k_south*self.cc[1][3])  # Fonte
+            if 'dirichlet' == self.cc[0][0].lower() and 'neumann' == self.cc[0][3].lower():
+                # Dirichlet em west e neumann em south
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*(k_east+3*k_west)+ self.ry*k_north) + 1  # Ap
+                A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*(k_east+k_west/3)  # Ae
+                A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*((k_east+k_west/3)*P_matriz_old[i+1]-(k_east+3*k_west)*P_matriz_old[i])
+                    + self.ry*k_north*(P_matriz_old[i-self.nx]-P_matriz_old[i]))+8/3*self.beta*self.rx*k_west*self.cc[1][0])  # Fonte
+            if 'neumann' == self.cc[0][0].lower() and 'neumann' == self.cc[0][3].lower():
+                # Neumann em west e neumann em south
+                A_matriz[i, i] = self.theta*self.beta*(self.rx*k_east + self.ry*k_north) + 1  # Ap
+                A_matriz[i, i + 1] = -self.theta*self.beta*self.rx*k_east  # Ae
+                A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
+                b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_east*(P_matriz_old[i+1]-P_matriz_old[i])
+                    + self.ry*k_north*(P_matriz_old[i-self.nx]-P_matriz_old[i])))  # Fonte
 
             x0 = P_matriz_old # chute inicial
-            P_matriz_new = Solve.TDMA(A_matriz, b_matriz)
+            P_matriz_new, _, _,_ = Solve(n = 8).Gauss_Seidel(A=A_matriz, B=b_matriz, x0=x0)
+
+
             P_matriz_old = P_matriz_new.copy()
             P_matriz[n + 1, :] = P_matriz_new
-        self.pressures = P_matriz
+            P_grid.append(P_matriz[n + 1].reshape((self.ny, self.nx)))
+        self.pressures = P_grid
 
     def compute_error(self, analytical, times_to_compute_err : list = None):
         if times_to_compute_err == None:
@@ -574,16 +837,23 @@ class Numerical:
         self.local_error_grids = local_error_grids
         self.times_found = times_found
 
-    def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None, pos_to_plot: list = None, units: str = 'SI'):
+    def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None, pos_to_plot: list = None, units: str = 'SI', cmap = None):
         from PostProcess import plot_p_curves
         from PostProcess import plot_p
-        try:
-            plot_p_curves(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
-            plot_p(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
-        except:
-            plot_p_curves(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
-            plot_p(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
-
+        from PostProcess import plot_p2d_map
+        from PostProcess import plot_p2d_3Dsurface
+        from PostProcess import maps_plot_2D
+        if self.dimension == 1:
+            try:
+                plot_p_curves(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
+                plot_p(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
+            except:
+                plot_p_curves(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
+                plot_p(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
+        elif self.dimension == 2:
+            plot_p2d_map(self.L_list, self.pressures, self.time_list, title, times_to_plot, units)
+            plot_p2d_3Dsurface(self.L_list, self.pressures, self.time_list, title, times_to_plot, units)
+            maps_plot_2D(self.time_list, times_to_plot, self.L_list, self.pressures, cmap=cmap, units = units)
 ########################################################################################
 def mapa_permeabilidade(nx, ny, k_low, k_up,file_path='.', file_name='mapa_permeabilidade.csv', plot=True):
     blocks = nx * ny

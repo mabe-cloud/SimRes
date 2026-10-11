@@ -65,6 +65,7 @@ class Solve:
     #Métodos Iterativos
 
     def Gauss_Seidel(self, A, B, x0):
+        self.Scarvorought1966()
         x = np.array(x0)
         iter = 0
         n = []
@@ -93,6 +94,7 @@ class Solve:
 
 
     def Gauss_Seidel_rlx(self, A, B, l, x0):
+        self.Scarvorought1966()
         x = np.array(x0)
         iter = 0
         n = []
