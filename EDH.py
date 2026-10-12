@@ -266,7 +266,7 @@ class Numerical:
         self.coordinates = self.coordinates.lower()
 
     def model_parameters(self, eta: float, k: float | list, phi: float, mu: float, ct: float, lengths: list, area: float,
-                         final_time: float, nt: int, rw=None, pocos : dict = None):
+                         final_time: float, nt: int, rw=None, pocos : list[dict] = None):
         """
         Define os parâmetros de entrada do modelo.
 

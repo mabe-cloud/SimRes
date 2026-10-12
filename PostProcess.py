@@ -214,6 +214,7 @@ def plot_p2d_3Dsurface(L: list, Pressures: list, time_list: list, title : str = 
             ax.set_xlabel(f'Posição X ({m_unidade})')
             ax.set_ylabel(f'Posição Y ({m_unidade})')
             ax.set_zlabel(f'Pressão ({p_unidade})')
+            ax.set_zlim(top=vmax)
             ax.view_init(elev=30, azim=55)
             plt.title(f'{title} — t = {time:g} {t_unidade}')
             p_fig.colorbar(surf, shrink=0.5, aspect=10)
