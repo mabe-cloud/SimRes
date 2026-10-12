@@ -266,7 +266,7 @@ class Numerical:
         self.coordinates = self.coordinates.lower()
 
     def model_parameters(self, eta: float, k: float | list, phi: float, mu: float, ct: float, lengths: list, area: float,
-                         final_time: float, nt: int, rw=None):
+                         final_time: float, nt: int, rw=None, pocos : dict = None):
         """
         Define os parâmetros de entrada do modelo.
 
@@ -300,12 +300,15 @@ class Numerical:
         self.nt = nt
         self.dt = self.final_time/self.nt
         self.lengths = lengths
+        self.pocos = pocos
 
         if len(self.grid) == 1:
             self.dx = lengths[0]/self.grid[0]
+            self.h = lengths[1]
         if len(self.grid) == 2:
             self.dx = lengths[0] / self.grid[0]
             self.dy = lengths[1] / self.grid[1]
+            self.h = lengths[2]
 
         if self.dimension == 1:
             self.beta = (self.eta * self.dt) / (self.dx ** 2)
@@ -507,6 +510,10 @@ class Numerical:
         P_matriz[0,:] = self.p0
         P_grid.append(P_matriz[0].reshape((self.ny, self.nx)))
         b_matriz = np.zeros(self.nx*self.ny)
+        well_valid_index = []
+        for i in range(1, self.ny - 1):
+            for j in range(i * self.nx + 1, (i + 1) * self.nx - 1):
+                well_valid_index.append(j)
 
         for n in range(self.nt):
             if n%5 == 0:
@@ -775,6 +782,28 @@ class Numerical:
                 b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_east*(P_matriz_old[i+1]-P_matriz_old[i])
                     + self.ry*k_north*(P_matriz_old[i-self.nx]-P_matriz_old[i])))  # Fonte
 
+            # Poços
+            if self.pocos is not None:
+                for well in self.pocos:
+                    if well['tipo'] == 'produtor':
+                        if well['indice'] in well_valid_index:
+                            j = well['indice']
+                        else: raise IndexError('O poço deve estar posicionado em um bloco da região central da malha!')
+                        k_row = j // self.nx + 1
+                        k_col = j % self.nx + 1
+                        lamb = self.k[k_row, k_col]/self.mu
+                        req = 0.140365*np.sqrt(self.dx**2+self.dy**2)
+                        WI = 2*np.pi*self.h/(np.log(req/well['rw']))
+                        A_matriz[j, j] +=  lamb*WI*self.dt/(self.dx*self.dy*self.h*self.phi*self.ct)  # Ap
+                        b_matriz[j] += lamb*WI*self.dt/(self.dx*self.dy*self.h*self.phi*self.ct)*well['pw']  # Fonte
+                    elif well['tipo'] == 'injetor':
+                        if well['indice'] in well_valid_index:
+                            j = well['indice']
+                        else: raise IndexError('O poço deve estar posicionado em um bloco da região central da malha!')
+                        b_matriz[j] += well['qw']*self.dt/(self.dx*self.dy*self.h*self.phi*self.ct)  # Fonte
+                    else:
+                        raise ValueError('Poço deve ser produtor ou injetor! Verifique a definição do poço.')
+
             x0 = P_matriz_old # chute inicial
             P_matriz_new, _, _,_ = Solve(n = 8).Gauss_Seidel(A=A_matriz, B=b_matriz, x0=x0)
 
@@ -855,12 +884,11 @@ class Numerical:
             plot_p2d_3Dsurface(self.L_list, self.pressures, self.time_list, title, times_to_plot, units)
             maps_plot_2D(self.time_list, times_to_plot, self.L_list, self.pressures, cmap=cmap, units = units)
 ########################################################################################
-def mapa_permeabilidade(nx, ny, k_low, k_up,file_path='.', file_name='mapa_permeabilidade.csv', plot=True):
+def mapa_permeabilidade(nx, ny, k_low, k_up, file_path='.', file_name='mapa_permeabilidade.csv', plot=True, seed=None):
     blocks = nx * ny
-    sample = qmc.LatinHypercube(d=1)
+    sample = qmc.LatinHypercube(d=1, seed=seed)
     sample_permiability = sample.random(n=blocks)
     sample_permiability = qmc.scale(sample_permiability, [k_low], [k_up])
-
 
     k_grid = sample_permiability.reshape((ny, nx))
 
@@ -887,7 +915,6 @@ def mapa_permeabilidade(nx, ny, k_low, k_up,file_path='.', file_name='mapa_perme
         fig_path = os.path.join(file_path, f"{f_name}.png")
 
         k_fig.savefig(fig_path, dpi=300, bbox_inches='tight')
-
         plt.show()
 
     return k_grid, k_fig
