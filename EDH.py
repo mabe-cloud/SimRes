@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from scipy.special import erfc
 from scipy.special import expi
@@ -301,6 +303,12 @@ class Numerical:
         self.dt = self.final_time/self.nt
         self.lengths = lengths
         self.pocos = pocos
+        if self.pocos is not None:
+            for well in self.pocos:
+                if well['tipo'] == 'produtor':
+                    well['q_list'] = []
+                elif well['tipo'] == 'injetor':
+                    well['p_list'] = []
 
         if len(self.grid) == 1:
             self.dx = lengths[0]/self.grid[0]
@@ -514,7 +522,29 @@ class Numerical:
         for i in range(1, self.ny - 1):
             for j in range(i * self.nx + 1, (i + 1) * self.nx - 1):
                 well_valid_index.append(j)
-
+        if self.pocos is not None:
+            for well in self.pocos:
+                if well['tipo'] == 'produtor':
+                    if well['indice'] in well_valid_index:
+                        j = well['indice']
+                    else:
+                        raise IndexError('O poço deve estar posicionado em um bloco da região central da malha!')
+                elif well['tipo'] == 'injetor':
+                    if well['indice'] in well_valid_index:
+                        j = well['indice']
+                    else:
+                        raise IndexError('O poço deve estar posicionado em um bloco da região central da malha!')
+                else:
+                    raise ValueError('Poço deve ser produtor ou injetor! Verifique a definição do poço.')
+                k_row = j // self.nx + 1
+                k_col = j % self.nx + 1
+                lamb = self.k[k_row, k_col] / self.mu
+                req = 0.140365 * np.sqrt(self.dx ** 2 + self.dy ** 2)
+                WI = 2 * np.pi * self.h / (np.log(req / well['rw']))
+                if well['tipo'] == 'produtor':
+                    well['q_list'].append(lamb * WI * (well['pw'] - P_matriz_old[well['indice']]))
+                elif well['tipo'] == 'injetor':
+                    well['p_list'].append(well['qw'] / (lamb * WI) + P_matriz_old[well['indice']])
         for n in range(self.nt):
             if n%5 == 0:
                 print(f'Progresso: {n/self.nt*100}%')
@@ -791,9 +821,9 @@ class Numerical:
                         else: raise IndexError('O poço deve estar posicionado em um bloco da região central da malha!')
                         k_row = j // self.nx + 1
                         k_col = j % self.nx + 1
-                        lamb = self.k[k_row, k_col]/self.mu
-                        req = 0.140365*np.sqrt(self.dx**2+self.dy**2)
-                        WI = 2*np.pi*self.h/(np.log(req/well['rw']))
+                        lamb = self.k[k_row, k_col] / self.mu
+                        req = 0.140365 * np.sqrt(self.dx ** 2 + self.dy ** 2)
+                        WI = 2 * np.pi * self.h / (np.log(req / well['rw']))
                         A_matriz[j, j] +=  lamb*WI*self.dt/(self.dx*self.dy*self.h*self.phi*self.ct)  # Ap
                         b_matriz[j] += lamb*WI*self.dt/(self.dx*self.dy*self.h*self.phi*self.ct)*well['pw']  # Fonte
                     elif well['tipo'] == 'injetor':
@@ -806,9 +836,22 @@ class Numerical:
 
             x0 = P_matriz_old # chute inicial
             P_matriz_new, _, _,_ = Solve(n = 8).Gauss_Seidel(A=A_matriz, B=b_matriz, x0=x0)
-
-
             P_matriz_old = P_matriz_new.copy()
+            if self.pocos is not None:
+                for well in self.pocos:
+                    if well['tipo'] == 'produtor':
+                        j = well['indice']
+                    elif well['tipo'] == 'injetor':
+                        j = well['indice']
+                    k_row = j // self.nx + 1
+                    k_col = j % self.nx + 1
+                    lamb = self.k[k_row, k_col] / self.mu
+                    req = 0.140365 * np.sqrt(self.dx ** 2 + self.dy ** 2)
+                    WI = 2 * np.pi * self.h / (np.log(req / well['rw']))
+                    if well['tipo'] == 'produtor':
+                        well['q_list'].append(lamb * WI * (well['pw'] - P_matriz_old[well['indice']]))
+                    elif well['tipo'] == 'injetor':
+                        well['p_list'].append(well['qw'] / (lamb * WI) + P_matriz_old[well['indice']])
             P_matriz[n + 1, :] = P_matriz_new
             P_grid.append(P_matriz[n + 1].reshape((self.ny, self.nx)))
         self.pressures = P_grid
@@ -872,6 +915,7 @@ class Numerical:
         from PostProcess import plot_p2d_map
         from PostProcess import plot_p2d_3Dsurface
         from PostProcess import maps_plot_2D
+        from PostProcess import well_plots_2D
         if self.dimension == 1:
             try:
                 plot_p_curves(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
@@ -883,6 +927,9 @@ class Numerical:
             plot_p2d_map(self.L_list, self.pressures, self.time_list, title, times_to_plot, units)
             plot_p2d_3Dsurface(self.L_list, self.pressures, self.time_list, title, times_to_plot, units)
             maps_plot_2D(self.time_list, times_to_plot, self.L_list, self.pressures, cmap=cmap, units = units)
+            if self.pocos is not None:
+                well_plots_2D(self.time_list, self.pocos,units = units)
+
 ########################################################################################
 def mapa_permeabilidade(nx, ny, k_low, k_up, file_path='.', file_name='mapa_permeabilidade.csv', plot=True, seed=None):
     blocks = nx * ny

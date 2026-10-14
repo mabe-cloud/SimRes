@@ -87,8 +87,8 @@ t_list_to_plot = [0, 20, 40, 60, 80, 100, 120]
 ######### Five spot - 4 pocos injetores e 1 poco produtor #########
 ###################################################################
 
-pocos = [{'tipo': 'injetor', 'qw': 150, 'indice': 164}, {'tipo': 'injetor', 'qw': 150, 'indice': 196},
-         {'tipo': 'injetor', 'qw': 150, 'indice': 1444}, {'tipo': 'injetor', 'qw': 150, 'indice': 1476}, {'tipo': 'produtor', 'pw': 100, 'rw': 0.08,'indice': 740}]
+pocos = [{'tipo': 'injetor', 'rw': 0.08,'qw': 150, 'indice': 164}, {'tipo': 'injetor', 'rw': 0.08, 'qw': 150, 'indice': 196},
+         {'tipo': 'injetor', 'rw': 0.08, 'qw': 150, 'indice': 1444}, {'tipo': 'injetor', 'rw': 0.08, 'qw': 150, 'indice': 1476}, {'tipo': 'produtor', 'pw': 100, 'rw': 0.08,'indice': 740}]
 
 k_grid = np.array(pd.read_csv('mapa_permeabilidade.csv', sep=',', header=None))
 

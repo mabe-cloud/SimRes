@@ -396,6 +396,47 @@ def maps_plot_2D(time_list, t_selected, L_list, Pressures, cmap=None, units = 'S
     fig.suptitle('Evolução temporal do campo de pressões 2D',size=16)
     plt.show()
 
+def well_plots_2D(time_list, wells, units = 'SI'):
+    """
+    Plota as curvas de pressões e de vazões de poços injetores e produtores, respectivamente.
+    """
+    if units == "SI":
+        t_unidade = 's'
+        p_unidade = 'Pa'
+        m_unidade = 'm'
+        q_unidade = 'm$^3$/s'
+    elif units == 'BR':
+        t_unidade = 'h'
+        p_unidade = 'kgf/cm$^2$'
+        m_unidade = 'm'
+        q_unidade = 'm$^3$/d'
+    else:
+        t_unidade = 'h'
+        p_unidade = 'psi'
+        m_unidade = 'ft'
+        q_unidade = 'bbl/d'
+    fig_prod, ax_prod = plt.subplots(figsize=(9, 6), dpi=120)
+    fig_inj, ax_inj = plt.subplots(figsize=(9, 6), dpi=120)
+    for well in wells:
+        if well['tipo'] =='produtor':
+            ax_prod.plot(time_list,well['q_list'], label=f'Poço com índice {well["indice"]}')
+        elif well['tipo'] =='injetor':
+            ax_inj.plot(time_list,well['p_list'], label=f'Poço com índice {well["indice"]}')
+    ax_prod.set_xlabel(f'Tempos ({t_unidade})', size=12)
+    ax_prod.set_ylabel(f"Vazão modelada ({q_unidade})", size=12)
+    ax_prod.grid(True, alpha=0.8)
+    ax_prod.invert_yaxis()
+    ax_prod.set_title('Vazões nos poços produtores', size=13)
+    ax_prod.legend()
+    fig_prod.tight_layout()
+    ax_inj.set_xlabel(f'Tempos ({t_unidade})', size=12)
+    ax_inj.set_ylabel(f"Pressão modelada ({p_unidade})", size=12)
+    ax_inj.grid(True, alpha=0.8)
+    ax_inj.set_title('Pressão nos poços injetores', size=14)
+    ax_inj.legend()
+    fig_inj.tight_layout()
+    plt.show()
+
 def error_plots(Erros, dx, dt, units='BR'):
     if units == "SI":
         t_unidade = 's'
