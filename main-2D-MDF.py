@@ -39,11 +39,11 @@ pe = 300
 
 p2_implicita_validacao = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['dirichlet', 'dirichlet','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1, system_units='BR')
 p2_implicita_validacao.model_parameters(eta=None, k=k_grid, phi=phi, mu=mu, ct=ct, lengths=[Lx, Ly, h],area=None, final_time=t_list[-1], nt=NT, pocos=None)
-# p2_implicita_validacao.run()
+p2_implicita_validacao.run()
 
 t_list_to_plot = [0, 24*2, 24*4, 24*6, 24*8, 24*10] # 0, 2, 4, 6, 8 e 10 dias
 
-# p2_implicita_validacao.postprocess(title='Solução Numérica 2D',times_to_plot=t_list_to_plot, units='BR')
+p2_implicita_validacao.postprocess(title='Solução Numérica 2D',times_to_plot=t_list_to_plot, units='BR', cmap='plasma')
 
 ####################################################
 ######### Reservatório com 1 poco produtor #########
@@ -59,11 +59,11 @@ pe = p0
 
 p2_implicita_1pocoprod = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['Neumann', 'Neumann','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1, system_units='BR')
 p2_implicita_1pocoprod.model_parameters(eta=None, k=k_grid, phi=phi, mu=mu, ct=ct, lengths=[Lx, Ly, h],area=None, final_time=t_list[-1], nt=NT, pocos=pocos)
-# p2_implicita_1pocoprod.run()
+p2_implicita_1pocoprod.run()
 
 t_list_to_plot = [0, 24*2, 24*4, 24*6, 24*8, 24*10] # 0, 2, 4, 6, 8 e 10 dias
 
-# p2_implicita_1pocoprod.postprocess(title='Solução Numérica 2D',times_to_plot=t_list_to_plot, units='BR')
+p2_implicita_1pocoprod.postprocess(title='Solução Numérica 2D',times_to_plot=t_list_to_plot, units='BR', cmap='RdYlBu')
 
 #############################################################
 ######### Reservatório com 1 poco produtor e falhas #########
@@ -74,11 +74,11 @@ k_grid = np.array(pd.read_csv('mapa_permeabilidade_falhas.csv', sep=',', header=
 
 p2_implicita_falha = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['Neumann', 'Neumann','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1, system_units='BR')
 p2_implicita_falha.model_parameters(eta=None, k=k_grid, phi=phi, mu=mu, ct=ct, lengths=[Lx, Ly, h],area=None, final_time=t_list[-1], nt=NT, pocos=pocos)
-# p2_implicita_falha.run()
+p2_implicita_falha.run()
 
 t_list_to_plot = [0, 24*2, 24*4, 24*6, 24*8, 24*10] # 0, 2, 4, 6, 8 e 10 dias
 
-# p2_implicita_falha.postprocess(title='Solução Numérica 2D',times_to_plot=t_list_to_plot, units='BR')
+p2_implicita_falha.postprocess(title='Solução Numérica 2D',times_to_plot=t_list_to_plot, units='BR', cmap='PiYG')
 
 ###################################################################
 ######### Five spot - 4 pocos injetores e 1 poco produtor #########
@@ -94,4 +94,4 @@ p2_implicita_fivespot.model_parameters(eta=None, k=k_grid, phi=phi, mu=mu, ct=ct
 p2_implicita_fivespot.run()
 
 t_list_to_plot = [0, 24*2, 24*4, 24*6, 24*8, 24*10] # 0, 2, 4, 6, 8 e 10 dias
-p2_implicita_fivespot.postprocess(title='Solução Numérica 2D',times_to_plot=t_list_to_plot, units='BR')
+p2_implicita_fivespot.postprocess(title='Solução Numérica 2D',times_to_plot=t_list_to_plot, units='BR', cmap='Spectral')

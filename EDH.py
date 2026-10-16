@@ -945,9 +945,9 @@ class Numerical:
                 plot_p_curves(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
                 plot_p(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
         elif self.dimension == 2:
-            plot_p2d_map(self.L_list, self.pressures, self.time_list, title, times_to_plot, units)
-            plot_p2d_3Dsurface(self.L_list, self.pressures, self.time_list, title, times_to_plot, units)
-            maps_plot_2D(self.time_list, times_to_plot, self.L_list, self.pressures, cmap=cmap, units = units)
+            plot_p2d_map(self.L_list, self.pressures, self.time_list, title, times_to_plot, units, cmap=cmap)
+            plot_p2d_3Dsurface(self.L_list, self.pressures, self.time_list, title, times_to_plot, units, cmap=cmap)
+            maps_plot_2D(self.time_list, times_to_plot, self.L_list, self.pressures, units = units, cmap=cmap)
             if self.pocos is not None:
                 for well in self.pocos:
                     if well['tipo'] == 'produtor':
@@ -962,7 +962,7 @@ class Numerical:
                                 well['inj_acul'].append(well['qw']*self.dt)
                             else:
                                 well['inj_acul'].append(well['qw'] * self.dt + well['inj_acul'][-1])
-                well_plots_2D(self.time_list, self.pocos,units = units)
+                well_plots_2D(self.time_list, self.pocos, units = units)
 
 ########################################################################################
 def mapa_permeabilidade(nx, ny, k_low, k_up, file_path='.', file_name='mapa_permeabilidade.csv', plot=True, seed=None):

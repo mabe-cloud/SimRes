@@ -132,11 +132,10 @@ def plot_p(L: list, Pressures: list, time_list: list, title : str = None, xlim :
     ax2.grid(visible=True, axis='both')
     plt.show()
 
-def plot_p2d_map(L: list, Pressures: list, time_list: list, title : str = None, times_to_plot: list = None, units = 'SI', save_path='resultados/mapa_pressoes.gif'):
+def plot_p2d_map(L: list, Pressures: list, time_list: list, title : str = None, times_to_plot: list = None, units = 'SI', cmap=None, save_path='resultados/mapa_pressoes.gif'):
     """
     Plota gráficos de pressão para domínio espacial 2D em um mapa de pressões.
     """
-
     if units == "SI":
         t_unidade = 's'
         p_unidade = 'Pa'
@@ -150,6 +149,7 @@ def plot_p2d_map(L: list, Pressures: list, time_list: list, title : str = None, 
         p_unidade = 'psi'
         m_unidade = 'ft'
 
+    mapa = cmap if cmap is not None else 'jet'
 
     vmin = min(np.min(p_grid) for p_grid in Pressures)
     vmax = max(np.max(p_grid) for p_grid in Pressures)
@@ -165,8 +165,8 @@ def plot_p2d_map(L: list, Pressures: list, time_list: list, title : str = None, 
     for pressure, time in zip(Pressures, time_list):
         if time in times_found:
             p_fig, ax = plt.subplots(figsize=(7, 5))
-            im = ax.imshow(pressure,cmap='jet',aspect='auto',origin='upper',extent=[0, L[0][-1], 0, L[1][-1]],
-                       vmin=vmin,vmax=vmax)
+            im = ax.imshow(pressure, cmap=mapa, aspect='auto', origin='upper', extent=[0, L[0][-1], 0, L[1][-1]],
+                           vmin=vmin, vmax=vmax)
             barra_cores = p_fig.colorbar(im, ax=ax)
             barra_cores.set_label(f'Pressão ({p_unidade})')
             ax.set_title(f'{title} — t = {time:g} {t_unidade}')
@@ -174,12 +174,10 @@ def plot_p2d_map(L: list, Pressures: list, time_list: list, title : str = None, 
             ax.set_ylabel(f'Posição Y ({m_unidade})')
             plt.show()
 
-
-def plot_p2d_3Dsurface(L: list, Pressures: list, time_list: list, title : str = None, times_to_plot: list = None, units = 'SI', save_path='resultados/mapa_pressoes.gif'):
+def plot_p2d_3Dsurface(L: list, Pressures: list, time_list: list, title : str = None, times_to_plot: list = None, units = 'SI', cmap=None, save_path='resultados/mapa_pressoes.gif'):
     """
     Plota gráficos de pressão para domínio espacial 2D em uma superfície 3D.
     """
-
     if units == "SI":
         t_unidade = 's'
         p_unidade = 'Pa'
@@ -193,6 +191,7 @@ def plot_p2d_3Dsurface(L: list, Pressures: list, time_list: list, title : str = 
         p_unidade = 'psi'
         m_unidade = 'ft'
 
+    mapa = cmap if cmap is not None else 'jet'
 
     vmin = min(np.min(p_grid) for p_grid in Pressures)
     vmax = max(np.max(p_grid) for p_grid in Pressures)
@@ -210,7 +209,7 @@ def plot_p2d_3Dsurface(L: list, Pressures: list, time_list: list, title : str = 
 
             p_fig = plt.figure(figsize=(13, 13))
             ax = p_fig.add_subplot(111, projection='3d')
-            surf = ax.plot_surface(X, Y, pressure, cmap='jet', vmin=vmin, vmax=vmax)
+            surf = ax.plot_surface(X, Y, pressure, cmap=mapa, vmin=vmin, vmax=vmax)
             ax.set_xlabel(f'Posição X ({m_unidade})')
             ax.set_ylabel(f'Posição Y ({m_unidade})')
             ax.set_zlabel(f'Pressão ({p_unidade})')
@@ -329,7 +328,7 @@ def maps_plot(time_list, t_selected, x_pos, p_an, p_an_times, p_explicit, p_impl
     #
     # plt.show()
 
-def maps_plot_2D(time_list, t_selected, L_list, Pressures, cmap=None, units = 'SI'):
+def maps_plot_2D(time_list, t_selected, L_list, Pressures, units = 'SI', cmap=None):
     """
     Plota mapas comparativos para tempos específicos do mapa de pressões 2D.
     """
