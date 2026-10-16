@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import qmc, lognorm
 import pandas as pd
 import os
+import tqdm
 
 class Analytical:
     """
@@ -291,6 +292,17 @@ class Numerical:
             A área pode ser fornecida diretamente, caso não se defina todos os comprimentos necessários.
         final_time : tempo final que a modelagem vai atingir
             Define o tempo em que será feita a modelagem.
+        nt : float
+            Informa a quantidade de passos de tempo a serem empregados na simulação.
+        rw : float
+            Configura o raio do poço. Utilizado na simulação 1D para, por exemplo, ajustar os limites de plotagem dos gráficos
+        pocos : list[dict]
+            Lista de dicionários que contém as configurações dos poços a serem inseridos no modelo.
+            Os atributos do dicionário são:
+                {'tipo': 'injetor' ou 'produtor', 'rw': float, 'qw' ou 'pw': float, 'indice': int}
+            Em que o índice define o bloco onde será inserido o poço, conforme o esquema de malha do programa (de cima para baixo, da esquerda para a direita).
+            Embora não seja necessário informar o raio do poço injetor para que ele seja modela, o raio é utilizado no cálculo das pressões do poço injetor.
+            Poços com pressão prescrita são tratados como produtores e poços com vazão prescrita são tratados como injetores.
         """
         if eta is None and k is float:
             self.eta = k / (phi * mu * ct)
@@ -307,8 +319,10 @@ class Numerical:
             for well in self.pocos:
                 if well['tipo'] == 'produtor':
                     well['q_list'] = []
+                    well['prod_acul'] = []
                 elif well['tipo'] == 'injetor':
                     well['p_list'] = []
+                    well['inj_acul'] = []
 
         if len(self.grid) == 1:
             self.dx = lengths[0]/self.grid[0]
@@ -543,11 +557,18 @@ class Numerical:
                 WI = 2 * np.pi * self.h / (np.log(req / well['rw']))
                 if well['tipo'] == 'produtor':
                     well['q_list'].append(lamb * WI * (well['pw'] - P_matriz_old[well['indice']]))
+                    # for q in well['q_list']:
+                    #     well['prod_acul'].append(q * self.dt)
                 elif well['tipo'] == 'injetor':
                     well['p_list'].append(well['qw'] / (lamb * WI) + P_matriz_old[well['indice']])
-        for n in range(self.nt):
-            if n%5 == 0:
-                print(f'Progresso: {n/self.nt*100}%')
+                    # for _ in well['p_list']:
+                    #     well['inj_acul'].append(well['qw'] * self.dt)
+
+        # for n in range(self.nt):
+        from tqdm import tqdm
+        for n in tqdm(range(self.nt), 'Progresso'):
+            # if n%5 == 0:
+            #     print(f'Progresso: {n/self.nt*100}%')
             A_matriz = np.zeros((self.nx*self.ny, self.nx*self.ny))
 
             # Central
@@ -928,6 +949,19 @@ class Numerical:
             plot_p2d_3Dsurface(self.L_list, self.pressures, self.time_list, title, times_to_plot, units)
             maps_plot_2D(self.time_list, times_to_plot, self.L_list, self.pressures, cmap=cmap, units = units)
             if self.pocos is not None:
+                for well in self.pocos:
+                    if well['tipo'] == 'produtor':
+                        for q in well['q_list']:
+                            if len(well['prod_acul']) == 0:
+                                well['prod_acul'].append(q*self.dt)
+                            else:
+                                well['prod_acul'].append(q * self.dt + well['prod_acul'][-1])
+                    elif well['tipo'] == 'injetor':
+                        for _ in well['p_list']:
+                            if len(well['inj_acul']) == 0:
+                                well['inj_acul'].append(well['qw']*self.dt)
+                            else:
+                                well['inj_acul'].append(well['qw'] * self.dt + well['inj_acul'][-1])
                 well_plots_2D(self.time_list, self.pocos,units = units)
 
 ########################################################################################
@@ -952,7 +986,7 @@ def mapa_permeabilidade(nx, ny, k_low, k_up, file_path='.', file_name='mapa_perm
         im = ax.imshow(k_grid, cmap='jet', aspect='auto', origin='lower', extent=[0, nx, 0, ny])
 
         barra_cores = k_fig.colorbar(im, ax=ax)
-        barra_cores.set_label('Permeabilidade (D)')
+        barra_cores.set_label('Permeabilidade (mD)')
 
         ax.set_title('Distribuição de Permeabilidades')
         ax.set_xlabel('Blocos X')

@@ -405,23 +405,30 @@ def well_plots_2D(time_list, wells, units = 'SI'):
         p_unidade = 'Pa'
         m_unidade = 'm'
         q_unidade = 'm$^3$/s'
+        v_unidade = 'm$^3$'
     elif units == 'BR':
         t_unidade = 'h'
         p_unidade = 'kgf/cm$^2$'
         m_unidade = 'm'
         q_unidade = 'm$^3$/d'
+        v_unidade = 'm$^3$'
     else:
         t_unidade = 'h'
         p_unidade = 'psi'
         m_unidade = 'ft'
         q_unidade = 'bbl/d'
+        v_unidade = 'bbl'
     fig_prod, ax_prod = plt.subplots(figsize=(9, 6), dpi=120)
     fig_inj, ax_inj = plt.subplots(figsize=(9, 6), dpi=120)
+    fig_acu_prod, ax_acu_prod = plt.subplots(figsize=(9, 6), dpi=120)
+    fig_acu_inj, ax_acu_inj = plt.subplots(figsize=(9, 6), dpi=120)
     for well in wells:
         if well['tipo'] =='produtor':
             ax_prod.plot(time_list,well['q_list'], label=f'Poço com índice {well["indice"]}')
+            ax_acu_prod.plot(time_list,well['prod_acul'], label=f'Poço com índice {well["indice"]}')
         elif well['tipo'] =='injetor':
             ax_inj.plot(time_list,well['p_list'], label=f'Poço com índice {well["indice"]}')
+            ax_acu_inj.plot(time_list, well['inj_acul'], label=f'Poço com índice {well["indice"]}')
     ax_prod.set_xlabel(f'Tempos ({t_unidade})', size=12)
     ax_prod.set_ylabel(f"Vazão modelada ({q_unidade})", size=12)
     ax_prod.grid(True, alpha=0.8)
@@ -435,6 +442,19 @@ def well_plots_2D(time_list, wells, units = 'SI'):
     ax_inj.set_title('Pressão nos poços injetores', size=14)
     ax_inj.legend()
     fig_inj.tight_layout()
+    ax_acu_prod.set_xlabel(f'Tempos ({t_unidade})', size=12)
+    ax_acu_prod.set_ylabel(f"Produção ({v_unidade})", size=12)
+    ax_acu_prod.grid(True, alpha=0.8)
+    ax_acu_prod.set_title('Produção acumulada dos poços produtores', size=14)
+    ax_acu_prod.legend()
+    fig_acu_prod.tight_layout()
+    ax_acu_inj.set_xlabel(f'Tempos ({t_unidade})', size=12)
+    ax_acu_inj.set_ylabel(f"Injeção ({v_unidade})", size=12)
+    ax_acu_inj.grid(True, alpha=0.8)
+    ax_acu_inj.set_title('Injeção acumulada dos poços injetores', size=14)
+    ax_acu_inj.legend()
+    fig_acu_inj.tight_layout()
+
     plt.show()
 
 def error_plots(Erros, dx, dt, units='BR'):
