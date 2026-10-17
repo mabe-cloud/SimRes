@@ -304,6 +304,27 @@ class Numerical:
             Embora não seja necessário informar o raio do poço injetor para que ele seja modela, o raio é utilizado no cálculo das pressões do poço injetor.
             Poços com pressão prescrita são tratados como produtores e poços com vazão prescrita são tratados como injetores.
         """
+        if self.system_units == 'BR':
+            if k is not None and  phi is not None and mu is not None and ct is not None:
+                k = k*9.86923e-16 # m2
+                mu = mu*1e-3 # Pa.s
+                ct = ct*(98066.52)**-1 # Pa-1
+                self.ci = self.ci*98066.52# Pa
+                final_time = final_time*3600 # s
+                i = 0
+                for cc, value in zip(*self.cc):
+                    if 'dirichlet' == cc.lower():
+                        self.cc[1][i] = value * 98066.52
+                    elif 'neumann' == cc.lower():
+                        self.cc[1][i] = value / 86400 # m3/s
+                    i+=1
+                if pocos is not None:
+                    for well in pocos:
+                        if well['tipo'] == 'produtor':
+                            well['pw'] = well['pw'] * 98066.52 # Pa
+                        elif well['tipo'] == 'injetor':
+                            well['qw'] = well['qw'] / 86400 # m3/s
+
         if eta is None and k is float:
             self.eta = k / (phi * mu * ct)
         else:
@@ -447,6 +468,18 @@ class Numerical:
                     pass
                 if self.theta != 0:
                     self.implicita_2D()
+        if self.system_units == 'BR':
+            self.pressures = [P/98066.52 for P in self.pressures] # kgf/cm2
+            self.time_list = self.time_list / 3600 # horas
+            self.dt = self.dt/3600 # horas
+            if self.pocos is not None:
+                for well in self.pocos:
+                    if well['tipo'] == 'produtor':
+                        well['pw'] = well['pw'] / 98066.52  # kgf/cm2
+                        well['q_list'] = [q * 3600 for q in well['q_list']]  # m3/h
+                    elif well['tipo'] == 'injetor':
+                        well['qw'] = well['qw'] * 3600  # m3/h
+                        well['p_list'] = [p / 98066.52 for p in well['p_list']]  # kgf/cm2
 
     def explicita_1D(self):
         self.pressures = np.zeros((self.nt + 1, self.nx))
@@ -533,6 +566,11 @@ class Numerical:
         P_grid.append(P_matriz[0].reshape((self.ny, self.nx)))
         b_matriz = np.zeros(self.nx*self.ny)
         well_valid_index = []
+        Vx_grid = []
+        Vy_grid = []
+        Vx, Vy = self.velocity_map(P_grid[0])
+        Vx_grid.append(Vx)
+        Vy_grid.append(Vy)
         for i in range(1, self.ny - 1):
             for j in range(i * self.nx + 1, (i + 1) * self.nx - 1):
                 well_valid_index.append(j)
@@ -636,6 +674,7 @@ class Numerical:
                     A_matriz[i, i - self.nx] = -self.theta*self.beta*self.ry*k_north  # An
                     b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*(k_east*P_matriz_old[i+1]+k_west*P_matriz_old[i-1]
                                     -(k_east+k_west)*P_matriz_old[i])+self.ry*k_north*(P_matriz_old[i-self.nx]-P_matriz_old[i])))  # Fonte
+
             # Fronteira Leste
             for i in range(2 * self.nx - 1, (self.ny - 1) * self.nx, self.nx):
                 k_row = i // self.nx +1
@@ -758,7 +797,6 @@ class Numerical:
                 b_matriz[i] = (P_matriz_old[i]+(1-self.theta)*self.beta*(self.rx*k_east*(P_matriz_old[i+1]-P_matriz_old[i])
                     +self.ry*k_south*(P_matriz_old[i+self.nx]-P_matriz_old[i])))  # Fonte
 
-
             # Canto Inferior Direito
             i = self.ny * self.nx - 1
             k_row = i // self.nx + 1
@@ -874,8 +912,13 @@ class Numerical:
                     elif well['tipo'] == 'injetor':
                         well['p_list'].append(well['qw'] / (lamb * WI) + P_matriz_old[well['indice']])
             P_matriz[n + 1, :] = P_matriz_new
+            Vx, Vy = self.velocity_map(P_matriz_old)
+            Vx_grid.append(Vx)
+            Vy_grid.append(Vy)
             P_grid.append(P_matriz[n + 1].reshape((self.ny, self.nx)))
         self.pressures = P_grid
+        self.Vx = Vx_grid
+        self.Vy = Vy_grid
 
     def compute_error(self, analytical, times_to_compute_err : list = None):
         if times_to_compute_err == None:
@@ -930,6 +973,52 @@ class Numerical:
         self.local_error_grids = local_error_grids
         self.times_found = times_found
 
+    def velocity_map(self, P_grid):
+        def media_harmonica(k1, k2):
+            return 2/(1/k1+1/k2)
+        P_grid = P_grid.reshape((self.ny, self.nx))
+        k_grid = self.k[1:-1, 1:-1]
+
+        vx_face = np.zeros((self.ny, self.nx + 1))
+        vy_face = np.zeros((self.ny + 1, self.nx))
+
+        kx_face = media_harmonica(k_grid[:,:-1], k_grid[:,1:])
+        ky_face = media_harmonica(k_grid[:-1,:], k_grid[1:,:])
+
+        vx_face[:,1:-1] = (-kx_face/self.mu*(P_grid[:,1:] - P_grid[:,:-1])/self.dx)
+        vy_face[1:-1,:] = -(-ky_face/self.mu*(P_grid[:-1,:] - P_grid[1:,:])/self.dy)
+
+        # Fronteiras
+        # Usando a matriz expandida de permeabilidades para calcular k nas faces da fronteira
+        k_w = media_harmonica(self.k[1:-1, 0],self.k[1:-1, 1])
+        k_e = media_harmonica(self.k[1:-1, -2],self.k[1:-1, -1])
+        k_n = media_harmonica(self.k[0, 1:-1],self.k[1, 1:-1])
+        k_s = media_harmonica(self.k[-2, 1:-1],self.k[-1, 1:-1])
+
+        if self.cc[0][0].lower() == 'dirichlet':
+            dPdx_w = (-8/3*self.cc[1][0]+ 3 * P_grid[:, 0]-1/3 * P_grid[:, 1])/self.dx
+            vx_face[:, 0] = -k_w/self.mu*dPdx_w
+        else:
+            vx_face[:, 0] = 0
+        if self.cc[0][1].lower() == 'dirichlet':
+            dPdx_e = (8/3*self.cc[1][1]-3*P_grid[:, -1]+ 1/3*P_grid[:, -2])/self.dx
+            vx_face[:, -1] = -k_e/self.mu*dPdx_e
+        else:
+            vx_face[:, -1] = 0
+        if self.cc[0][2].lower() == 'dirichlet':
+            dPdy_n = (8/3*self.cc[1][2]-3*P_grid[0, :]+ 1/3*P_grid[1, :])/self.dy
+            vy_face[0, :] =  k_n/self.mu * dPdy_n
+        else:
+            vy_face[0, :] = 0
+        if self.cc[0][3].lower() == 'dirichlet':
+            dPdy_s = (-8/3*self.cc[1][3]+3*P_grid[-1, :]-1/3*P_grid[-2, :])/self.dy
+            vy_face[-1, :] = k_s/self.mu*dPdy_s
+        else:
+            vy_face[-1, :] = 0
+        Vx = (vx_face[:, :-1] + vx_face[:, 1:])/2
+        Vy = (vy_face[:-1, :] + vy_face[1:, :])/2
+
+        return Vx, Vy
     def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None, pos_to_plot: list = None, units: str = 'SI', cmap = None):
         from PostProcess import plot_p_curves
         from PostProcess import plot_p
@@ -937,6 +1026,7 @@ class Numerical:
         from PostProcess import plot_p2d_3Dsurface
         from PostProcess import maps_plot_2D
         from PostProcess import well_plots_2D
+        from PostProcess import velocity_field
         if self.dimension == 1:
             try:
                 plot_p_curves(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
@@ -948,20 +1038,20 @@ class Numerical:
             plot_p2d_map(self.L_list, self.pressures, self.time_list, title, times_to_plot, units, cmap=cmap)
             plot_p2d_3Dsurface(self.L_list, self.pressures, self.time_list, title, times_to_plot, units, cmap=cmap)
             maps_plot_2D(self.time_list, times_to_plot, self.L_list, self.pressures, units = units, cmap=cmap)
+            velocity_field(self.time_list, times_to_plot, self.L_list, self.Vx, self.Vy, units = units, cmap=cmap)
             if self.pocos is not None:
                 for well in self.pocos:
                     if well['tipo'] == 'produtor':
-                        for q in well['q_list']:
-                            if len(well['prod_acul']) == 0:
-                                well['prod_acul'].append(q*self.dt)
-                            else:
-                                well['prod_acul'].append(q * self.dt + well['prod_acul'][-1])
+                        prod_acul = [0]
+                        for i in range(1, len(well['q_list'])):
+                            delta_vol = 0.5 * (well['q_list'][i - 1] + well['q_list'][i]) * self.dt
+                            prod_acul.append(prod_acul[-1] + delta_vol)
+                        well['prod_acul'] = prod_acul
                     elif well['tipo'] == 'injetor':
-                        for _ in well['p_list']:
-                            if len(well['inj_acul']) == 0:
-                                well['inj_acul'].append(well['qw']*self.dt)
-                            else:
-                                well['inj_acul'].append(well['qw'] * self.dt + well['inj_acul'][-1])
+                        inj_acul = [0]
+                        for i in range(1, len(well['p_list'])):
+                            inj_acul.append(inj_acul[-1] + well['qw'] * self.dt)
+                        well['inj_acul'] = inj_acul
                 well_plots_2D(self.time_list, self.pocos, units = units)
 
 ########################################################################################

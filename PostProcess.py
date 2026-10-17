@@ -1,6 +1,5 @@
 from matplotlib import pyplot as plt
 import numpy as np
-from matplotlib.animation import FuncAnimation, PillowWriter
 
 
 def plot_p_curves(L :list,pressures:list, time_list:list, title :str = None,xlim : list = None, times_to_plot:list = None, units = 'SI'):
@@ -132,7 +131,7 @@ def plot_p(L: list, Pressures: list, time_list: list, title : str = None, xlim :
     ax2.grid(visible=True, axis='both')
     plt.show()
 
-def plot_p2d_map(L: list, Pressures: list, time_list: list, title : str = None, times_to_plot: list = None, units = 'SI', cmap=None, save_path='resultados/mapa_pressoes.gif'):
+def plot_p2d_map(L: list, Pressures: list, time_list: list, title : str = None, times_to_plot: list = None, units = 'SI', cmap=None):
     """
     Plota gráficos de pressão para domínio espacial 2D em um mapa de pressões.
     """
@@ -409,13 +408,13 @@ def well_plots_2D(time_list, wells, units = 'SI'):
         t_unidade = 'h'
         p_unidade = 'kgf/cm$^2$'
         m_unidade = 'm'
-        q_unidade = 'm$^3$/d'
+        q_unidade = 'm$^3$/h'
         v_unidade = 'm$^3$'
     else:
         t_unidade = 'h'
         p_unidade = 'psi'
         m_unidade = 'ft'
-        q_unidade = 'bbl/d'
+        q_unidade = 'bbl/h'
         v_unidade = 'bbl'
     fig_prod, ax_prod = plt.subplots(figsize=(9, 6), dpi=120)
     fig_inj, ax_inj = plt.subplots(figsize=(9, 6), dpi=120)
@@ -444,6 +443,7 @@ def well_plots_2D(time_list, wells, units = 'SI'):
     ax_acu_prod.set_xlabel(f'Tempos ({t_unidade})', size=12)
     ax_acu_prod.set_ylabel(f"Produção ({v_unidade})", size=12)
     ax_acu_prod.grid(True, alpha=0.8)
+    ax_acu_prod.invert_yaxis()
     ax_acu_prod.set_title('Produção acumulada dos poços produtores', size=14)
     ax_acu_prod.legend()
     fig_acu_prod.tight_layout()
@@ -453,8 +453,63 @@ def well_plots_2D(time_list, wells, units = 'SI'):
     ax_acu_inj.set_title('Injeção acumulada dos poços injetores', size=14)
     ax_acu_inj.legend()
     fig_acu_inj.tight_layout()
-
     plt.show()
+
+def velocity_field(time_list, t_selected, L_list, Vx, Vy, units = 'SI', cmap=None):
+    # Por enquanto, não está sendo convertido de volta o campo de velocidades, calculado pelo código no SI!
+    if units == "SI":
+        v_unidade = 'm/s'
+        m_unidade = 'm'
+    elif units == 'BR':
+        v_unidade = 'm/s'
+        m_unidade = 'm'
+    else:
+        v_unidade = 'm/s'
+        m_unidade = 'm'
+
+    if cmap is None:
+        mapa = "YlGnBu"
+    else:
+        mapa = cmap
+
+    X, Y = np.meshgrid(L_list[0], L_list[1])
+    idxs = []
+    times_found = []
+    for selected_time in t_selected:
+        for idx, time in enumerate(time_list):
+            if time == selected_time:
+                idxs.append(idx)
+                times_found.append(time)
+    dx = L_list[0][1]-L_list[0][0]
+    dy = L_list[1][1] - L_list[1][0]
+    comprimento = min(dx, dy)
+    for vx, vy, time in zip(Vx, Vy, time_list):
+        if time in times_found:
+            # Sem normalização das retas
+            velocidades = np.hypot(vx, vy)
+            fig, ax = plt.subplots(figsize=(9, 6), dpi=120)
+            campo_vel = ax.quiver(X, Y, vx, vy, velocidades, cmap=mapa, angles='xy')
+            fig.colorbar(campo_vel, ax=ax, label=f'Velocidade de Darcy ({v_unidade})')
+            ax.set_xlabel(f'Posição X ({m_unidade})')
+            ax.set_ylabel(f'Posição Y ({m_unidade})')
+            ax.invert_yaxis()
+            ax.set_title(f'Campo de velocidades — t = {time:g}')
+            plt.tight_layout()
+            plt.show()
+            # Com retas normalizadas
+            vx_norm = np.divide(vx, velocidades)
+            vy_norm = np.divide(vy, velocidades)
+            vx = vx_norm * comprimento
+            vy = vy_norm * comprimento
+            fig, ax = plt.subplots(figsize=(9, 6), dpi=120)
+            campo_vel = ax.quiver(X, Y, vx, vy, velocidades, cmap=mapa, angles='xy')
+            fig.colorbar(campo_vel, ax=ax, label=f'Velocidade de Darcy ({v_unidade})')
+            ax.set_xlabel(f'Posição X ({m_unidade})')
+            ax.set_ylabel(f'Posição Y ({m_unidade})')
+            ax.invert_yaxis()
+            ax.set_title(f'Campo de velocidades — t = {time:g}')
+            plt.tight_layout()
+            plt.show()
 
 def error_plots(Erros, dx, dt, units='BR'):
     if units == "SI":
