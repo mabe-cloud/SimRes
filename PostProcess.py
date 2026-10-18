@@ -458,12 +458,17 @@ def well_plots_2D(time_list, wells, units = 'SI'):
 def velocity_field(time_list, t_selected, L_list, Vx, Vy, units = 'SI', cmap=None):
     # Por enquanto, não está sendo convertido de volta o campo de velocidades, calculado pelo código no SI!
     if units == "SI":
+        t_unidade = 's'
         v_unidade = 'm/s'
         m_unidade = 'm'
     elif units == 'BR':
-        v_unidade = 'm/s'
+        t_unidade = 'h'
+        v_unidade = 'm/h'
         m_unidade = 'm'
+        Vx = [vx * 3600 for vx in Vx]  # m/h
+        Vy = [vy * 3600 for vy in Vy]  # m/h
     else:
+        t_unidade = 's'
         v_unidade = 'm/s'
         m_unidade = 'm'
 
@@ -493,7 +498,7 @@ def velocity_field(time_list, t_selected, L_list, Vx, Vy, units = 'SI', cmap=Non
             ax.set_xlabel(f'Posição X ({m_unidade})')
             ax.set_ylabel(f'Posição Y ({m_unidade})')
             ax.invert_yaxis()
-            ax.set_title(f'Campo de velocidades — t = {time:g}')
+            ax.set_title(f'Campo de velocidades — t = {time:g} {t_unidade}')
             plt.tight_layout()
             plt.show()
             # Com retas normalizadas
@@ -507,7 +512,7 @@ def velocity_field(time_list, t_selected, L_list, Vx, Vy, units = 'SI', cmap=Non
             ax.set_xlabel(f'Posição X ({m_unidade})')
             ax.set_ylabel(f'Posição Y ({m_unidade})')
             ax.invert_yaxis()
-            ax.set_title(f'Campo de velocidades — t = {time:g}')
+            ax.set_title(f'Campo de velocidades — t = {time:g} {t_unidade}')
             plt.tight_layout()
             plt.show()
 
