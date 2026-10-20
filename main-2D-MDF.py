@@ -37,7 +37,7 @@ NT = 60
 pw = 100
 pe = 300
 
-p2_implicita_validacao = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['dirichlet', 'dirichlet','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1, system_units='SI')
+p2_implicita_validacao = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['dirichlet', 'dirichlet','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1)
 p2_implicita_validacao.model_parameters(eta=None, k=k_grid, phi=phi, mu=mu, ct=ct, lengths=[Lx, Ly, h],area=None, final_time=t_list[-1], nt=NT, pocos=None)
 p2_implicita_validacao.run()
 
@@ -57,7 +57,7 @@ NT = 60
 pw = p0
 pe = p0
 
-p2_implicita_1pocoprod = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['Neumann', 'Neumann','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1, system_units='SI')
+p2_implicita_1pocoprod = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['Neumann', 'Neumann','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1)
 p2_implicita_1pocoprod.model_parameters(eta=None, k=k_grid, phi=phi, mu=mu, ct=ct, lengths=[Lx, Ly, h],area=None, final_time=t_list[-1], nt=NT, pocos=pocos)
 p2_implicita_1pocoprod.run()
 
@@ -72,7 +72,7 @@ p2_implicita_1pocoprod.postprocess(title='Solução Numérica 2D',times_to_plot=
 pocos = [{'tipo': 'produtor', 'pw': 100, 'rw': 0.08,'indice': 558}] # produtor na borda do modelo
 k_grid = np.array(pd.read_csv('mapa_permeabilidade_falhas.csv', sep=',', header=None))
 
-p2_implicita_falha = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['Neumann', 'Neumann','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1, system_units='SI')
+p2_implicita_falha = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['Neumann', 'Neumann','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1)
 p2_implicita_falha.model_parameters(eta=None, k=k_grid, phi=phi, mu=mu, ct=ct, lengths=[Lx, Ly, h],area=None, final_time=t_list[-1], nt=NT, pocos=pocos)
 p2_implicita_falha.run()
 
@@ -89,7 +89,7 @@ pocos = [{'tipo': 'injetor', 'rw': 0.08,'qw': 550, 'indice': 164}, {'tipo': 'inj
 
 k_grid = np.array(pd.read_csv('mapa_permeabilidade.csv', sep=',', header=None))
 
-p2_implicita_fivespot = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['Neumann', 'Neumann','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1, system_units='SI')
+p2_implicita_fivespot = Numerical(dimension=2, coordinates='Linear', ci=p0, cc=[['Neumann', 'Neumann','Neumann', 'Neumann'],[pw, pe, pn, ps]], grid=[NX, NY],theta=1)
 p2_implicita_fivespot.model_parameters(eta=None, k=k_grid, phi=phi, mu=mu, ct=ct, lengths=[Lx, Ly, h],area=None, final_time=t_list[-1], nt=NT, pocos=pocos)
 p2_implicita_fivespot.run()
 
