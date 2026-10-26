@@ -30,7 +30,6 @@ NY = 40
 #######################################
 ######### Validacao do modelo #########
 #######################################
-# k_grid, _ = EDH.mapa_permeabilidade(NX+2, NY+2, k_low=110, k_up=110.00000001, file_name='mapa_permeabilidade_MDV.csv')
 k_grid = np.array(pd.read_csv('mapa_permeabilidade.csv', sep=',', header=None))
 t_list = [240]
 NT = 60

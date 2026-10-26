@@ -1226,7 +1226,7 @@ class Numerical:
                         if well['indice'] in well_valid_index:
                             j = well['indice']
                         else: raise IndexError('O poço deve estar posicionado em um bloco da região central da malha!')
-                        b_matriz[j] += well['qw']*self.dt/(self.dx * self.dy * self.h)  # Fonte
+                        b_matriz[j] += well['qw']/(self.dx * self.dy * self.h)  # Fonte
                     else:
                         raise ValueError('Poço deve ser produtor ou injetor! Verifique a definição do poço.')
 
@@ -1310,6 +1310,16 @@ class Numerical:
         self.local_error_grids = local_error_grids
         self.times_found = times_found
 
+    def compute_error(self, numerical):
+        diff = self.pressures - numerical
+        Err_relative = []
+        for an, num in zip(new_an_pressures,new_num_pressures):
+            for i in range(len(an)):
+                soma += abs((an[i] - num[i]) / an[i])
+            Err_relative.append(soma)
+            soma = 0
+        self.Err_relative = Err_relative
+
     def velocity_map(self, P_grid):
         def media_harmonica(k1, k2):
             return 2/(1/k1+1/k2)
@@ -1331,27 +1341,44 @@ class Numerical:
         k_e = media_harmonica(self.k[1:-1, -2],self.k[1:-1, -1])
         k_n = media_harmonica(self.k[0, 1:-1],self.k[1, 1:-1])
         k_s = media_harmonica(self.k[-2, 1:-1],self.k[-1, 1:-1])
-
-        if self.cc[0][0].lower() == 'dirichlet':
-            dPdx_w = (-8/3*self.cc[1][0]+ 3 * P_grid[:, 0]-1/3 * P_grid[:, 1])/self.dx
-            vx_face[:, 0] = -k_w/self.mu*dPdx_w
+        if 'mdf' == self.method.lower():
+            if self.cc[0][0].lower() == 'dirichlet':
+                dPdx_w = (-8/3*self.cc[1][0]+ 3 * P_grid[:, 0]-1/3 * P_grid[:, 1])/self.dx
+                vx_face[:, 0] = -k_w/self.mu*dPdx_w
+            else:
+                vx_face[:, 0] = 0
+            if self.cc[0][1].lower() == 'dirichlet':
+                dPdx_e = (8/3*self.cc[1][1]-3*P_grid[:, -1]+ 1/3*P_grid[:, -2])/self.dx
+                vx_face[:, -1] = -k_e/self.mu*dPdx_e
+            else:
+                vx_face[:, -1] = 0
+            if self.cc[0][2].lower() == 'dirichlet':
+                dPdy_n = (8/3*self.cc[1][2]-3*P_grid[0, :]+ 1/3*P_grid[1, :])/self.dy
+                vy_face[0, :] =  k_n/self.mu * dPdy_n
+            else:
+                vy_face[0, :] = 0
+            if self.cc[0][3].lower() == 'dirichlet':
+                dPdy_s = (-8/3*self.cc[1][3]+3*P_grid[-1, :]-1/3*P_grid[-2, :])/self.dy
+                vy_face[-1, :] = k_s/self.mu*dPdy_s
+            else:
+                vy_face[-1, :] = 0
         else:
-            vx_face[:, 0] = 0
-        if self.cc[0][1].lower() == 'dirichlet':
-            dPdx_e = (8/3*self.cc[1][1]-3*P_grid[:, -1]+ 1/3*P_grid[:, -2])/self.dx
-            vx_face[:, -1] = -k_e/self.mu*dPdx_e
-        else:
-            vx_face[:, -1] = 0
-        if self.cc[0][2].lower() == 'dirichlet':
-            dPdy_n = (8/3*self.cc[1][2]-3*P_grid[0, :]+ 1/3*P_grid[1, :])/self.dy
-            vy_face[0, :] =  k_n/self.mu * dPdy_n
-        else:
-            vy_face[0, :] = 0
-        if self.cc[0][3].lower() == 'dirichlet':
-            dPdy_s = (-8/3*self.cc[1][3]+3*P_grid[-1, :]-1/3*P_grid[-2, :])/self.dy
-            vy_face[-1, :] = k_s/self.mu*dPdy_s
-        else:
-            vy_face[-1, :] = 0
+            if self.cc[0][0].lower() == 'dirichlet':
+                vx_face[:, 0] = -2*k_w/(self.mu*self.dx)*(-self.cc[1][0]+P_grid[:, 0])
+            else:
+                vx_face[:, 0] = 0
+            if self.cc[0][1].lower() == 'dirichlet':
+                vx_face[:, -1] = -2*k_e/(self.mu*self.dx)*(-P_grid[:, -1]+self.cc[1][1])
+            else:
+                vx_face[:, -1] = 0
+            if self.cc[0][2].lower() == 'dirichlet':
+                vy_face[0, :] =  -2*k_n/(self.mu*self.dx)*(self.cc[1][2] - P_grid[0, :])
+            else:
+                vy_face[0, :] = 0
+            if self.cc[0][3].lower() == 'dirichlet':
+                vy_face[-1, :] = -2 * k_s / (self.mu * self.dx) * (P_grid[-1, :] - self.cc[1][3])
+            else:
+                vy_face[-1, :] = 0
         Vx = (vx_face[:, :-1] + vx_face[:, 1:])/2
         Vy = (vy_face[:-1, :] + vy_face[1:, :])/2
 
