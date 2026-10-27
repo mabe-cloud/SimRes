@@ -9,6 +9,8 @@ from scipy.stats import qmc, lognorm
 import pandas as pd
 import os
 import tqdm
+import copy
+import time
 
 class Analytical:
     """
@@ -1310,16 +1312,6 @@ class Numerical:
         self.local_error_grids = local_error_grids
         self.times_found = times_found
 
-    def compute_error(self, numerical):
-        diff = self.pressures - numerical
-        Err_relative = []
-        for an, num in zip(new_an_pressures,new_num_pressures):
-            for i in range(len(an)):
-                soma += abs((an[i] - num[i]) / an[i])
-            Err_relative.append(soma)
-            soma = 0
-        self.Err_relative = Err_relative
-
     def velocity_map(self, P_grid):
         def media_harmonica(k1, k2):
             return 2/(1/k1+1/k2)
@@ -1383,32 +1375,33 @@ class Numerical:
         Vy = (vy_face[:-1, :] + vy_face[1:, :])/2
 
         return Vx, Vy
-    def postprocess(self, title : str = None, xlim : list = None, times_to_plot: list = None, pos_to_plot: list = None, units: str = 'SI', cmap = None):
-        from PostProcess import plot_p_curves
-        from PostProcess import plot_p
-        from PostProcess import plot_p2d_map
-        from PostProcess import plot_p2d_3Dsurface
-        from PostProcess import maps_plot_2D
-        from PostProcess import well_plots_2D
-        from PostProcess import velocity_field
+
+    def postprocess(self, title: str = None, xlim: list = None, times_to_plot: list = None,
+                pos_to_plot: list = None, units: str = 'SI', cmap=None):
+        from PostProcess import plot_p_curves, plot_p
+        from PostProcess import plot_p2d_map, plot_p2d_3Dsurface
+        from PostProcess import maps_plot_2D, well_plots_2D, velocity_field
+
         if self.dimension == 1:
             try:
-                plot_p_curves(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
+                plot_p_curves(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot, units)
                 plot_p(self.L_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
             except:
-                plot_p_curves(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot,units)
+                plot_p_curves(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot, units)
                 plot_p(self.R_list, self.pressures, self.time_list, title, xlim, times_to_plot, pos_to_plot, units)
+
         elif self.dimension == 2:
             plot_p2d_map(self.L_list, self.pressures, self.time_list, title, times_to_plot, units, cmap=cmap)
             plot_p2d_3Dsurface(self.L_list, self.pressures, self.time_list, title, times_to_plot, units, cmap=cmap)
-            maps_plot_2D(self.time_list, times_to_plot, self.L_list, self.pressures, units = units, cmap=cmap)
-            velocity_field(self.time_list, times_to_plot, self.L_list, self.Vx, self.Vy, units = units, cmap=cmap)
+            maps_plot_2D(self.time_list, times_to_plot, self.L_list, self.pressures, units=units, cmap=cmap)
+            velocity_field(self.time_list, times_to_plot, self.L_list, self.Vx, self.Vy, units=units, cmap=cmap)
+
             if self.pocos is not None:
                 for well in self.pocos:
                     if well['tipo'] == 'produtor':
                         prod_acul = [0]
                         for i in range(1, len(well['q_list'])):
-                            delta_vol = 0.5 * (well['q_list'][i - 1] + well['q_list'][i]) * self.dt
+                            delta_vol = 0.5 * (well['q_list'][i-1] + well['q_list'][i]) * self.dt
                             prod_acul.append(prod_acul[-1] + delta_vol)
                         well['prod_acul'] = prod_acul
                     elif well['tipo'] == 'injetor':
@@ -1416,7 +1409,7 @@ class Numerical:
                         for i in range(1, len(well['p_list'])):
                             inj_acul.append(inj_acul[-1] + well['qw'] * self.dt)
                         well['inj_acul'] = inj_acul
-                well_plots_2D(self.time_list, self.pocos, units = units)
+                well_plots_2D(self.time_list, self.pocos, units=units)
 
 ########################################################################################
 def mapa_permeabilidade(nx, ny, k_low, k_up, file_path='.', file_name='mapa_permeabilidade.csv', plot=True, seed=None):
@@ -1453,3 +1446,121 @@ def mapa_permeabilidade(nx, ny, k_low, k_up, file_path='.', file_name='mapa_perm
         plt.show()
 
     return k_grid, k_fig
+
+def run_both_methods(config, units='SI'):
+    """
+    Roda a mesma configuração com MDF e MVF, para comparação dos métodos.
+
+    config : dict
+        Contém os valores necessários para rodar a simulação.
+    """
+    results = {}
+    for method in ('mdf', 'mvf'):
+        sim = Numerical(
+            dimension   = config['dimension'],
+            coordinates = config['coordinates'],
+            ci          = config['ci'],
+            cc          = copy.deepcopy(config['cc']),
+            grid        = copy.deepcopy(config['grid']),
+            theta       = config['theta'],
+            system_units= units,
+            method      = method,
+        )
+        sim.model_parameters(
+            eta        = config.get('eta'),
+            k          = copy.deepcopy(config['k']),
+            phi        = config['phi'],
+            mu         = config['mu'],
+            ct         = config['ct'],
+            lengths    = copy.deepcopy(config['lengths']),
+            area       = config.get('area'),
+            final_time = config['final_time'],
+            nt         = config['nt'],
+            pocos      = copy.deepcopy(config.get('pocos')),
+        )
+        t0 = time.perf_counter()
+        sim.run()
+        results[method] = {'sim': sim, 'time': time.perf_counter() - t0}
+    return results
+
+def plot_methods_comparison(results, times_to_plot=None, units='BR', cmap='plasma'):
+    """
+    Gera gráficos comparativos entre resultados obtidos pelos métodos MDF e MVF.
+    Emprega o uso do RMSE na avaliação do erro entre um esquema e outro.
+    """
+    if units == 'BR':
+        t_unid = 'h'
+        p_unid = 'kgf/cm²'
+    elif units == 'SI':
+        t_unid = 's'
+        p_unid = 'Pa'
+    mdf, mvf = results['mdf'], results['mvf']
+    s_mdf, s_mvf = mdf['sim'], mvf['sim']
+    p_mdf = np.array(s_mdf.pressures)
+    p_mvf = np.array(s_mvf.pressures)
+    delta = p_mdf - p_mvf
+    tlist = s_mdf.time_list
+    dmax = float(np.abs(delta).max())
+    fig, ax = plt.subplots(figsize=(6, 4), dpi=120)
+    bars = ax.bar(['MDF', 'MVF'], [mdf['time'], mvf['time']],
+                  color=['steelblue', 'indianred'])
+    ax.bar_label(bars)
+    ax.set_ylabel('Tempo (s)'); ax.set_title('Tempo: MDF × MVF')
+    ax.grid(True, axis='y', alpha=0.5)
+    plt.tight_layout()
+    plt.show()
+
+    if times_to_plot is None:
+        times_to_plot = [tlist[0], tlist[len(tlist)//2], tlist[-1]]
+        
+    idxs = []
+    times_found = []
+    for selected_time in times_to_plot:
+        for idx, time in enumerate(s_mdf.time_list):
+            if time == selected_time:
+                idxs.append(idx)
+                times_found.append(time)
+    n =len(idxs)
+    vmin = min(p_mdf.min(), p_mvf.min())
+    vmax = max(p_mdf.max(), p_mvf.max())
+
+    fig, axes = plt.subplots(3, n, figsize=(15, 11), dpi=120,
+                             sharex=True, sharey=True)
+
+    for k, idx in enumerate(idxs):
+        # MDF
+        ax = axes[0, k]
+        im1 = ax.imshow(p_mdf[idx], cmap=cmap, vmin=vmin, vmax=vmax, origin='upper')
+        ax.set_title(f'MDF — t = {tlist[idx]:.1f}{t_unid}', size=10)
+        fig.colorbar(im1, ax=ax, label=f'{p_unid}')
+
+        # MVF
+        ax = axes[1, k]
+        im2 = ax.imshow(p_mvf[idx], cmap=cmap, vmin=vmin, vmax=vmax, origin='upper')
+        ax.set_title(f'MVF — t = {tlist[idx]:.1f}{t_unid}', size=10)
+        fig.colorbar(im2, ax=ax, label=f'{p_unid}')
+        linthresh = max(dmax * 1e-3, 1e-12)
+
+        # Delta P
+        ax = axes[2, k]
+        im3 = ax.imshow(delta[idx], cmap='coolwarm', vmin=-dmax, vmax=dmax,
+                        origin='upper', aspect='equal')
+        ax.set_title(f'MDF - MVF — t = {tlist[idx]:.1f}{t_unid}', size=10)
+        fig.colorbar(im3, ax=ax, label=f'$\Delta$p ({p_unid})')
+
+    fig.suptitle(f'Comparativo MDF versus MVF', size=12)
+    plt.show()
+
+    rmse_alltimes  = np.array([np.sqrt(np.mean((p_mdf[i]-p_mvf[i])**2)) for i in range(len(tlist))])
+    abs_alltimes = np.array([np.max(np.abs(p_mdf[i]-p_mvf[i])) for i in range(len(tlist))])
+
+    fig, ax = plt.subplots(figsize=(9, 5), dpi=120)
+    ax.semilogy(tlist, rmse_alltimes, label='RMSE')
+    ax.semilogy(tlist, abs_alltimes, label='max $\Delta$p', ls='--')
+    ax.set_xlabel(f'Tempo ({t_unid})')
+    ax.set_ylabel(f'$\Delta$p ({p_unid})')
+    ax.set_title('Divergência dos métodos ao longo do tempo')
+    ax.grid(True, which='both', alpha=0.7)
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
