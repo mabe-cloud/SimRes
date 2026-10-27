@@ -44,6 +44,24 @@ t_list_to_plot = [0, 24*2, 24*4, 24*6, 24*8, 24*10] # 0, 2, 4, 6, 8 e 10 dias
 
 p2_implicita_validacao.postprocess(title='Solução Numérica 2D',times_to_plot=t_list_to_plot, units='BR', cmap='plasma')
 
+####################################
+######### COMPARAÇÃO MDF e MVF######
+####################################
+from EDH import run_both_methods, plot_methods_comparison
+config = dict(
+    dimension=2, coordinates='Linear', ci=p0,
+    cc=[['dirichlet', 'dirichlet', 'Neumann', 'Neumann'], [pw, pe, 0, 0]],
+    grid=[NX, NY], theta=1,
+    eta=None, k=k_grid, phi=phi, mu=mu, ct=ct,
+    lengths=[Lx, Ly, h], area=None,
+    final_time=t_list[-1], nt=NT,
+    pocos=None,
+)
+
+results_valid = run_both_methods(config)
+plot_methods_comparison(results_valid,times_to_plot=[0, 24*5, 24*10],
+                        units='BR', cmap='plasma')
+
 ####################################################
 ######### Reservatório com 1 poco produtor #########
 ####################################################
