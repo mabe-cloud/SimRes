@@ -15,7 +15,7 @@ import time
 class Analytical:
     """
     Classe contendo as soluções analíticas.
-    Suporta somente problemas 1D
+    Suporta problemas 1D e 2D (bifásico)
 
     dimension : int
         Define a quantidade de dimensões espaciais do modelo.
@@ -49,12 +49,12 @@ class Analytical:
         if len(grid) != dimension:
             raise ValueError('Há discrepância entre a definição da malha e a dimensão adotada para modelagem!')
 
-        if self.dimension != 1:
-            raise NotImplementedError('Não está implementada a modelagem de problemas com dimensão diferente de 1! ')
+        #if self.dimension != 1:
+        #    raise NotImplementedError('Não está implementada a modelagem de problemas com dimensão diferente de 1! ')
 
         self.coordinates = self.coordinates.lower()
 
-    def model_parameters(self, eta : float, k : float, phi : float, mu : float, ct : float, lengths : list, area : float, time_list : list, rw = None):
+    def model_parameters(self, eta : float, k : float | list, phi : float, mu : float, ct : float, lengths : list, area : float, time_list : list = None, final_time : float = None, nt: int = None, rw = None,  pocos: list[dict] = None, S : list = None):
         """
         Define os parâmetros de entrada do modelo.
 
@@ -84,6 +84,7 @@ class Analytical:
         self.time_list = time_list
         self.rw = rw
         self.p0 = self.ci
+        self.final_time, self.nt, self.pocos, self.S = final_time, nt, pocos, S # todo talvez n precise de nt...
         if self.dimension == 1:
             pos = 0
             for cc_type, value in zip(*self.cc):
@@ -118,6 +119,10 @@ class Analytical:
                         self.R_list = np.linspace(0.1, lengths[0], self.grid[0])
                     else:
                         self.R_list = np.linspace(self.rw, lengths[0], self.grid[0])
+        elif self.dimension == 2:
+            pass
+        else:
+            raise NotImplementedError('Não há solução analítica para problemas 3D')
 
     def run(self):
         if self.coordinates == 'linear':
